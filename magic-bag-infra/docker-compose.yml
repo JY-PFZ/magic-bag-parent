@@ -1,0 +1,51 @@
+services:
+  kafka:
+    image: bitnami/kafka:latest
+    container_name: kafka-kraft
+    ports:
+      - "9092:9092"  # 客户端访问端口
+      - "9093:9093"  # Controller 内部通信端口
+    environment:
+      # 启用 Kraft 模式（无 ZooKeeper）
+      - KAFKA_ENABLE_KRAFT=yes
+      # 节点 ID（集群唯一）
+      - KAFKA_CFG_NODE_ID=1
+      # 节点角色（同时作为 broker 和 controller）
+      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+      # Controller 集群配置（单节点指向自身 localhost）
+      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+      # 监听器配置
+      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+      # 安全协议映射
+      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+      # 对外暴露地址（宿主机访问）
+      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+      # 控制器监听器名称（必须与 LISTENERS 中的 CONTROLLER 匹配）
+      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+      # 元数据存储路径
+      - KAFKA_CFG_METADATA_LOG_DIRS=/bitnami/kafka/data/metadata
+      # 偏移量主题配置（单节点只能为 1）
+      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+      # 固定集群 ID（避免每次启动生成新 ID）
+      - KAFKA_CLUSTER_ID=41pFNxwDT3a-zUAdkJU4cA
+    volumes:
+      - kafka-kraft-data:/bitnami/kafka/data
+    networks:
+      - kafka-network
+    healthcheck:
+      # 健康检查：通过查看进程确认 Kafka 是否启动
+      test: ["CMD", "ps", "aux", "|", "grep", "kafka.Kafka"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+networks:
+  kafka-network:
+    driver: bridge
+
+volumes:
+  kafka-kraft-data:
+    driver: local
+    

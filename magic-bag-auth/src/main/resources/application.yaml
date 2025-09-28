@@ -1,0 +1,13 @@
+server:
+  port: 10017
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: magic-bag-auth
+  # 从 Spring Boot 2.4 开始，引入了新的配置导入机制 spring.config.import，它可以在 application.yml 中直接导入外部配置源（如 Nacos）
+  config:
+    import:
+      - nacos:${spring.application.name}-${spring.profiles.active}.yaml?group=${spring.application.name}&refresh=true
+      - nacos:shared-config.yaml?refresh=true

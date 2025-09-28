@@ -1,0 +1,101 @@
+spring:
+  cloud:
+    nacos:
+      username: nacos
+      password: nacos
+      discovery:
+        server-addr: 127.0.0.1:8848  # Nacos服务注册地址
+        group: MAGIC_BAG
+      config:
+        server-addr: 127.0.0.1:8848  # Nacos配置中心地址
+
+#    gateway:
+#      server:
+#        webflux:
+#          routes:
+#            # 认证服务路由
+#            - id: magic-bag-auth
+#              uri: lb://magic-bag-auth  # 路由到认证服务
+#              predicates:
+#                - Path=/api/auth/**  # 匹配 /api/auth 开头的路径
+#              filters:
+#                - name: StripPrefix
+#                  args:
+#                    parts: 1  # 修正：移除第一个路径段（/api），转发到后端为 /auth/**
+#                # 白名单过滤器：对当前路由的路径生效
+#                - name: WhitelistFilter
+#                  args:
+#                    whitelistPaths: ${security.whitelist.paths}
+#
+#            # 用户服务路由
+#            - id: magic-bag-user
+#              uri: lb://magic-bag-user  # 路由到用户服务
+#              predicates:
+#                - Path=/api/user/**  # 匹配 /api/user 开头的路径
+#              filters:
+#                - name: StripPrefix
+#                  args:
+#                    parts: 1  # 移除 /api 前缀，转发到后端为 /user/**
+#                # 限流过滤器（保持新版配置）
+#                - name: RequestRateLimiter
+#                  args:
+#                    redis-rate-limiter:
+#                      replenish-rate: 10
+#                      burst-capacity: 20
+#                    key-resolver: "#{@ipAddressKeyResolver}"
+#                # 重试过滤器（保持新版配置）
+#                - name: Retry
+#                  args:
+#                    retries: 3
+#                    statuses:
+#                      - BAD_GATEWAY
+#                      - SERVICE_UNAVAILABLE
+#                    backoff:
+#                      first-backoff: 100ms
+#                      max-backoff: 1000ms
+#                      factor: 2
+#                      based-on-previous-value: false
+#                # 白名单过滤器
+#                - name: WhitelistFilter
+#                  args:
+#                    whitelistPaths: ${security.whitelist.paths}
+#          # 2. 跨域配置（保持正确）
+#          globalcors:
+#            cors-configurations:
+#              '[/**]':
+#                allowed-origin-patterns: "*"
+#                allowed-methods: "*"
+#                allowed-headers: "*"
+#                allow-credentials: true
+#                max-age: 3600
+#
+#          # 3. 禁用默认静态资源处理（解决 NoResourceFoundException）
+#          default-filters:
+#            - name: RemoveResponseHeader
+#              args:
+#                name: X-Content-Type-Options
+#
+#
+#  # 禁用 Spring WebFlux 默认静态资源路由（关键）
+#  webflux:
+#    static-path-pattern: /nonexistent/**
+#
+## 4. 白名单配置（保持定义）
+#security:
+#  whitelist:
+#    paths:
+#      - /api/public/**
+#      - /api/auth/login
+#      - /api/auth/key
+#      - /api/auth/activate  # 需要放行的激活路径
+#      - /api/user/register
+#      - /static/**
+#      - /actuator/health
+#      - /swagger-ui.html
+#      - /v3/api-docs/**
+
+# 5. 日志配置（用于调试路由匹配）
+logging:
+  level:
+    org.springframework.cloud.gateway: DEBUG
+    org.springframework.cloud.gateway.route.RoutePredicateHandlerMapping: TRACE

@@ -1,0 +1,48 @@
+spring:
+  cloud:
+    nacos:
+      username: nacos
+      password: nacos
+      discovery:
+        server-addr: 127.0.0.1:8848  # Nacos服务注册地址
+        group: MAGIC_BAG
+      config:
+        server-addr: 127.0.0.1:8848  # Nacos配置中心地址
+
+  kafka:
+    consumer:
+      group-id: magic-bag
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: nus.iss.se.kafka.event
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+    listener:
+      missing-topics-fatal: false
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: magicbag.noreply@gmail.com
+    password: pwnu enib nibx mbny
+    protocol: smtp
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+          connectiontimeout: 5000
+          timeout: 5000
+          writetimeout: 5000
+
+logging:
+  level:
+    org.springframework.kafka: DEBUG
+    org.apache.kafka: WARN
+    nus.iss.se: DEBUG
