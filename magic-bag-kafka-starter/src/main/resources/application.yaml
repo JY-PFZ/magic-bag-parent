@@ -1,0 +1,19 @@
+spring:
+  application:
+    name: magic-bag-kafka-starter
+
+  kafka:
+    consumer:
+      group-id: magic-bag
+      auto-offset-reset: latest
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring.json.trusted.packages: nus.iss.se.kafka.event
+
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+    listener:
+      missing-topics-fatal: false

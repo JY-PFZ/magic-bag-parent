@@ -11,7 +11,7 @@
 
     <groupId>nus.iss.se</groupId>
     <artifactId>magic-bag-parent</artifactId>
-    <version>0.0.1-SNAPSHOT</version>
+    <version>1.0.0</version>
     <name>magic-bag-parent</name>
     <packaging>pom</packaging>
     <description>magic-bag-parent</description>
@@ -39,6 +39,7 @@
 
     <properties>
         <java.version>21</java.version>
+        <spring-boot.version>3.5.6</spring-boot.version>
         <spring-cloud.version>2025.0.0</spring-cloud.version>
         <spring-cloud-alibaba.version>2025.0.0.0-preview</spring-cloud-alibaba.version>
         <jjwt.version>0.11.5</jjwt.version>
@@ -185,6 +186,24 @@
     </dependencyManagement>
 
     <build>
+        <pluginManagement>
+            <plugins>
+                <!-- 统一管理 spring-boot-maven-plugin 版本 -->
+                <plugin>
+                    <groupId>org.springframework.boot</groupId>
+                    <artifactId>spring-boot-maven-plugin</artifactId>
+                    <version>${spring-boot.version}</version>
+                    <configuration>
+                        <excludes>
+                            <exclude>
+                                <groupId>org.projectlombok</groupId>
+                                <artifactId>lombok</artifactId>
+                            </exclude>
+                        </excludes>
+                    </configuration>
+                </plugin>
+            </plugins>
+        </pluginManagement>
         <plugins>
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
@@ -198,19 +217,14 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
-            <plugin>
-                <groupId>org.springframework.boot</groupId>
-                <artifactId>spring-boot-maven-plugin</artifactId>
-                <configuration>
-                    <excludes>
-                        <exclude>
-                            <groupId>org.projectlombok</groupId>
-                            <artifactId>lombok</artifactId>
-                        </exclude>
-                    </excludes>
-                </configuration>
-            </plugin>
         </plugins>
     </build>
+    <distributionManagement>
+        <repository>
+            <id>magic-bag-magic_bag</id>
+            <name>magic-bag-magic_bag</name>
+            <url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url>
+        </repository>
+    </distributionManagement>
 
 </project>

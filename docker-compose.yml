@@ -1,0 +1,118 @@
+services:
+  nacos:
+    image: nacos/nacos-server:v3.1.0
+    container_name: nacos
+    ports:
+      - "8848:8848"
+      - "8080:8080"
+      - "9848:9848"
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_TOKEN=k3b8Xq1v2Zm9Yp6Wn5Lr8As3Dx7Cv1Bn9Mq4Xs8Vj2Kp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4A==
+      - NACOS_AUTH_IDENTITY_KEY=nacos
+      - NACOS_AUTH_IDENTITY_VALUE=nacos
+      - NACOS_SERVER_IP=0.0.0.0
+      - NACOS_APPLICATION_HOST=0.0.0.0
+
+  magic-bag-gateway:
+    build:
+      context: .
+      dockerfile: magic-bag-gateway/Dockerfile
+      args:
+        APP_PORT: 10016
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-gateway
+    ports:
+      - "10016:10016"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
+  magic-bag-auth:
+    build:
+      context: .
+      dockerfile: magic-bag-auth/Dockerfile
+      args:
+        APP_PORT: 10017
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-auth
+    ports:
+      - "10017:10017"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
+  magic-bag-user:
+    build:
+      context: .
+      dockerfile: magic-bag-user/Dockerfile
+      args:
+        APP_PORT: 10018
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-user
+    ports:
+      - "10017:10018"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=nacos:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=nacos:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
+
+#  kafka:
+#    image: bitnami/kafka:latest
+#    container_name: kafka-kraft
+#    ports:
+#      - "9092:9092"  # 客户端访问端口
+#      - "9093:9093"  # Controller 内部通信端口
+#    environment:
+#      # 启用 Kraft 模式（无 ZooKeeper）
+#      - KAFKA_ENABLE_KRAFT=yes
+#      # 节点 ID（集群唯一）
+#      - KAFKA_CFG_NODE_ID=1
+#      # 节点角色（同时作为 broker 和 controller）
+#      - KAFKA_CFG_PROCESS_ROLES=broker,controller
+#      # Controller 集群配置（单节点指向自身 localhost）
+#      - KAFKA_CFG_CONTROLLER_QUORUM_VOTERS=1@localhost:9093
+#      # 监听器配置
+#      - KAFKA_CFG_LISTENERS=PLAINTEXT://:9092,CONTROLLER://:9093
+#      # 安全协议映射
+#      - KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP=PLAINTEXT:PLAINTEXT,CONTROLLER:PLAINTEXT
+#      # 对外暴露地址（宿主机访问）
+#      - KAFKA_CFG_ADVERTISED_LISTENERS=PLAINTEXT://localhost:9092
+#      # 控制器监听器名称（必须与 LISTENERS 中的 CONTROLLER 匹配）
+#      - KAFKA_CFG_CONTROLLER_LISTENER_NAMES=CONTROLLER
+#      # 元数据存储路径
+#      - KAFKA_CFG_METADATA_LOG_DIRS=/bitnami/kafka/data/metadata
+#      # 偏移量主题配置（单节点只能为 1）
+#      - KAFKA_CFG_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+#      - KAFKA_CFG_TRANSACTION_STATE_LOG_REPLICATION_FACTOR=1
+#      - KAFKA_CFG_TRANSACTION_STATE_LOG_MIN_ISR=1
+#      # 固定集群 ID（避免每次启动生成新 ID）
+#      - KAFKA_CLUSTER_ID=41pFNxwDT3a-zUAdkJU4cA
+#    volumes:
+#      - kafka-kraft-data:/bitnami/kafka/data
+#    networks:
+#      - kafka-network
+#    healthcheck:
+#      # 健康检查：通过查看进程确认 Kafka 是否启动
+#      test: ["CMD", "ps", "aux", "|", "grep", "kafka.Kafka"]
+#      interval: 5s
+#      timeout: 5s
+#      retries: 10
+
+networks:
+  kafka-network:
+    driver: bridge
+
+volumes:
+  kafka-kraft-data:
+    driver: local
+    

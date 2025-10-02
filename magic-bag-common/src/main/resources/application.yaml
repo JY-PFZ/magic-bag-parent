@@ -8,6 +8,7 @@ spring:
       port: 6379
 
 common:
+  url: http://localhost:10016
   jwt:
     secret: k3b8Xq1v2Zm9Yp6Wn5Lr8As3Dx7Cv1Bn9Mq4Xs8Vj2Kp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4A==
     expire-minutes: 120
@@ -16,5 +17,3 @@ common:
     boot: true
     public-key-path: .keys/public-key.pem
     private-key-path: .keys/private-key.pem
-
-
