@@ -22,6 +22,8 @@
         <module>magic-bag-user</module>
         <module>magic-bag-common</module>
         <module>magic-bag-kafka-starter</module>
+        <module>magic-bag-product</module>
+        <module>magic-bag-order</module>
     </modules>
     <url/>
     <licenses>

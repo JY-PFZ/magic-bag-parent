@@ -31,10 +31,3 @@ build/
 
 ### VS Code ###
 .vscode/
-
-### log ###
-logs
-kafka-data
-
-### pravate data ###
-.keys

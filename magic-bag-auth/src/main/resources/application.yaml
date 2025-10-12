@@ -11,3 +11,13 @@ spring:
     import:
       - nacos:${spring.application.name}-${spring.profiles.active}.yaml?group=${spring.application.name}&refresh=true
       - nacos:shared-config.yaml?refresh=true
+
+  cloud:
+    nacos:
+      username: nacos
+      password: nacos
+      discovery:
+        server-addr: 54.169.196.90:8848  # Nacos服务注册地址
+        group: MAGIC_BAG
+      config:
+        server-addr: 54.169.196.90:8848  # Nacos配置中心地址

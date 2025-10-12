@@ -7,6 +7,7 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.Result;
+import nus.iss.se.user.common.UserContextHolder;
 import nus.iss.se.user.dto.RegisterReq;
 import nus.iss.se.user.dto.UserDto;
 import nus.iss.se.user.entity.User;
@@ -22,13 +23,14 @@ import org.springframework.web.bind.annotation.*;
 public class UserController {
 
     private final IUserService userService;
+    private final UserContextHolder userContextHolder;
 
     @GetMapping("/hello")
     public Result<String> hello(){
-        return Result.success("hello spring security");
+        return Result.success("hello spring security:"+userContextHolder.getCurrentUser());
     }
 
-    @PostMapping("register")
+    @PostMapping("/register")
     public Result<Void> register(@RequestBody @Valid RegisterReq req){
         userService.register(req);
         return Result.success();
@@ -45,7 +47,7 @@ public class UserController {
     }
 
     @PutMapping("profile")
-    public Result<User> editProfile(@RequestBody @Valid UserDto dto){
+    public Result<Void> editProfile(@RequestBody @Valid UserDto dto){
         userService.editUser(dto);
         return Result.success();
     }

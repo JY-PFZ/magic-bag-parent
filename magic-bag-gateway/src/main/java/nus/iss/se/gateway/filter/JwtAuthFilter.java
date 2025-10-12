@@ -55,7 +55,7 @@ public class JwtAuthFilter implements GlobalFilter, Ordered {
 
         // 4.添加用户信息到请求头
         String username = jwtUtil.getClaims(token).getSubject();
-        exchange.mutate()
+        exchange = exchange.mutate()
                 .request(r -> r.header("X-Username", username))
                 .build();
 
