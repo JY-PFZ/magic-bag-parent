@@ -1,0 +1,57 @@
+package nus.iss.se.product.dto;
+
+import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Data;
+import jakarta.validation.constraints.*;
+
+import java.math.BigDecimal;
+import java.time.LocalTime;
+import java.util.Date;
+
+/**
+ * 更新产品请求DTO
+ */
+@Data
+@Schema(description = "更新产品请求")
+public class UpdateMagicBagRequest {
+    
+    @Size(max = 100, message = "产品标题长度不能超过100个字符")
+    @Schema(description = "产品标题", example = "今日面包盲盒")
+    private String title;
+    
+    @Size(max = 500, message = "产品描述长度不能超过500个字符")
+    @Schema(description = "产品描述", example = "新鲜面包组合，包含多种口味")
+    private String description;
+    
+    @DecimalMin(value = "0.01", message = "价格必须大于0")
+    @DecimalMax(value = "9999.99", message = "价格不能超过9999.99")
+    @Schema(description = "产品价格", example = "15.50")
+    private BigDecimal price;
+    
+    @Min(value = 0, message = "库存数量不能小于0")
+    @Max(value = 9999, message = "库存数量不能超过9999")
+    @Schema(description = "库存数量", example = "20")
+    private Integer quantity;
+    
+    @Schema(description = "自提开始时间", example = "18:00")
+    private LocalTime pickupStartTime;
+    
+    @Schema(description = "自提结束时间", example = "20:00")
+    private LocalTime pickupEndTime;
+    
+    @Schema(description = "有效日期", example = "2024-01-15")
+    private Date availableDate;
+    
+    @Size(max = 50, message = "分类名称长度不能超过50个字符")
+    @Schema(description = "产品分类", example = "面包")
+    private String category;
+    
+    @Size(max = 255, message = "图片URL长度不能超过255个字符")
+    @Schema(description = "产品图片URL", example = "https://example.com/bread.jpg")
+    private String imageUrl;
+    
+    @Schema(description = "是否活跃", example = "true")
+    private Boolean isActive;
+}
+
+
