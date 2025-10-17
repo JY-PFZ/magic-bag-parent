@@ -63,4 +63,6 @@ public interface IMagicBagService {
      * @return 删除成功的数量
      */
     int batchDeleteMagicBags(List<Integer> ids);
+
+	List<MagicBagDto> getBatchByIds(List<Integer> ids);
 }

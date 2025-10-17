@@ -193,6 +193,20 @@ public class MagicBagServiceImpl implements IMagicBagService {
         return result;
     }
     
+    @Override
+    public List<MagicBagDto> getBatchByIds(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return List.of();
+        }
+        
+        // 使用 MyBatis-Plus 的批量查询
+        List<MagicBag> magicBags = magicBagMapper.selectBatchIds(ids);
+        
+        return magicBags.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+    
     /**
      * 将实体转换为DTO
      * @param magicBag 实体对象

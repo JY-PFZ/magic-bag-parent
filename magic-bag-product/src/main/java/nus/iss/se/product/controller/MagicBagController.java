@@ -111,4 +111,15 @@ public class MagicBagController {
         int deletedCount = magicBagService.batchDeleteMagicBags(ids);
         return Result.success(deletedCount);
     }
+    
+    @PostMapping("/batch-query")
+    @Operation(summary = "批量查询盲盒", description = "根据ID列表批量查询盲盒信息")
+    public Result<List<MagicBagDto>> getBatchMagicBags(@RequestBody List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) {
+            return Result.success(List.of());
+        }
+        List<MagicBagDto> magicBags = magicBagService.getBatchByIds(ids);
+        return Result.success(magicBags);
+    }
+    
 }
