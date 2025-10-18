@@ -99,6 +99,57 @@ services:
       - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
       - SPRING_PROFILES_ACTIVE=dev
 
+  magic-bag-payment:
+    build:
+      context: .
+      dockerfile: magic-bag-payment/Dockerfile
+      args:
+        APP_PORT: 10021
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-payment
+    ports:
+      - "10021:10021"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
+  magic-bag-cart:
+    build:
+      context: .
+      dockerfile: magic-bag-cart/Dockerfile
+      args:
+        APP_PORT: 10022
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-cart
+    ports:
+      - "10022:10022"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
+  magic-bag-merchant:
+    build:
+      context: .
+      dockerfile: magic-bag-merchant/Dockerfile
+      args:
+        APP_PORT: 10023
+        TZ: Asia/Singapore
+        SERVICE_NAME: magic-bag-merchant
+    ports:
+      - "10023:10023"
+    volumes:
+      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+    environment:
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_PROFILES_ACTIVE=dev
+
 
   kafka:
     image: confluentinc/cp-kafka:7.9.4  # 使用 Confluent Platform 提供的 Kafka 镜像

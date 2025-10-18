@@ -26,6 +26,7 @@
         <module>magic-bag-order</module>
         <module>magic-bag-payment</module>
         <module>magic-bag-cart</module>
+        <module>magic-bag-merchant</module>
     </modules>
     <url/>
     <licenses>

@@ -22,6 +22,8 @@ magic-bag-auth 认证服务
 magic-bag-user user服务
 magic-bag-product 商品服务
 magic-bag-order 订单服务
+magic-bag-payment 支付服务
+magic-bag-cart 购物车服务
 magic-bag-common 通用组件库 
 magic-bag-kafka-starter kafka轮子
 
