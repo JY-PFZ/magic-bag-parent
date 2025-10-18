@@ -24,6 +24,7 @@
         <module>magic-bag-kafka-starter</module>
         <module>magic-bag-product</module>
         <module>magic-bag-order</module>
+        <module>magic-bag-payment</module>
     </modules>
     <url/>
     <licenses>
