@@ -1,0 +1,22 @@
+server:
+  port: 10021
+
+spring:
+  profiles:
+    active: dev
+  application:
+    name: magic-bag-payment
+  config:
+    import:
+      - nacos:${spring.application.name}-${spring.profiles.active}.yaml?group=${spring.application.name}&refresh=true
+      - nacos:shared-config.yaml?refresh=true
+
+  cloud:
+    nacos:
+      username: nacos
+      password: nacos
+      discovery:
+        server-addr: 54.169.196.90:8848  # Nacos??????
+        group: MAGIC_BAG
+      config:
+        server-addr: 54.169.196.90:8848  # Nacos??????
