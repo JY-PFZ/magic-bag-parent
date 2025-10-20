@@ -95,4 +95,13 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
 
         update(wrapper);
     }
+    @Override
+    public UserDto getUserById(Integer id) {
+        User user = this.baseMapper.selectById(id);
+        if (user == null) return null;
+
+        UserDto dto = new UserDto();
+        BeanUtils.copyProperties(user, dto);
+        return dto;
+    }
 }
