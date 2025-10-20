@@ -59,6 +59,20 @@
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
+
+        <!-- AWS SDK for Java -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>s3</artifactId>
+            <version>2.20.162</version>
+        </dependency>
+
+        <!-- AWS SDK for Java - Core -->
+        <dependency>
+            <groupId>software.amazon.awssdk</groupId>
+            <artifactId>aws-core</artifactId>
+            <version>2.20.162</version>
+        </dependency>
     </dependencies>
 
     <build>

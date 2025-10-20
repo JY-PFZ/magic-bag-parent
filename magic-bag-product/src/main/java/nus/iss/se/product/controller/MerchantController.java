@@ -8,10 +8,14 @@ import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.cache.UserContext;
 import nus.iss.se.product.common.UserContextHolder;
+import nus.iss.se.product.dto.FileUploadResponse;
 import nus.iss.se.product.dto.MerchantDto;
 import nus.iss.se.product.dto.MerchantUpdateDto;
+import nus.iss.se.product.enums.FileType;
+import nus.iss.se.product.service.FileUploadService;
 import nus.iss.se.product.service.IMerchantService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -27,6 +31,7 @@ public class MerchantController {
     
     private final IMerchantService merchantService;
     private final UserContextHolder userContextHolder;
+    private final FileUploadService fileUploadService;
     
     /**
      * 获取所有已审核的商户列表
@@ -63,6 +68,32 @@ public class MerchantController {
         }
         merchantService.updateMerchantProfile(merchantDto, currentUser.getId());
         return Result.success();
+    }
+    
+    /**
+     * 上传营业执照
+     */
+    @PostMapping("/upload-business-license")
+    @Operation(summary = "上传营业执照", description = "商户上传营业执照")
+    public Result<String> uploadBusinessLicense(@RequestParam("file") MultipartFile file) {
+        FileUploadResponse response = fileUploadService.uploadFile(file, FileType.MERCHANT_BUSINESS_LICENSE);
+        
+        // 更新商户信息
+        MerchantUpdateDto updateDto = new MerchantUpdateDto();
+        updateDto.setBusinessLicense(response.getFileUrl());
+        merchantService.updateMerchantProfile(updateDto, userContextHolder.getCurrentUser().getId());
+        
+        return Result.success(response.getFileUrl());
+    }
+    
+    /**
+     * 上传商户头像
+     */
+    @PostMapping("/upload-avatar")
+    @Operation(summary = "上传商户头像", description = "商户上传头像")
+    public Result<String> uploadAvatar(@RequestParam("file") MultipartFile file) {
+        FileUploadResponse response = fileUploadService.uploadFile(file, FileType.MERCHANT_AVATAR);
+        return Result.success(response.getFileUrl());
     }
     
     /**

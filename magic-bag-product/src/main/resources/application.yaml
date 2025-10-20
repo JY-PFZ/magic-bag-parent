@@ -16,7 +16,22 @@ spring:
       username: nacos
       password: nacos
       discovery:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 54.169.196.90:8848  # Nacos服务注册地址
         group: MAGIC_BAG
       config:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 54.169.196.90:8848  # Nacos配置中心地址
+
+# AWS S3 配置
+aws:
+  s3:
+    bucket: magic-bag-files-838811708767
+    region: ap-southeast-1
+    domain: https://magic-bag-files-838811708767.s3.ap-southeast-1.amazonaws.com
+
+# 文件上传配置
+file:
+  upload:
+    max-size: 5MB
+    allowed-types: jpg,jpeg,png,gif,webp
+    enable-virus-scan: true
+    enable-content-check: true

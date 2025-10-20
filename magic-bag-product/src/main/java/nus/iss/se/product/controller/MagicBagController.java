@@ -1,19 +1,24 @@
 package nus.iss.se.product.controller;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.cache.UserContext;
 import nus.iss.se.product.common.UserContextHolder;
 import nus.iss.se.product.dto.CreateMagicBagRequest;
+import nus.iss.se.product.dto.FileUploadResponse;
 import nus.iss.se.product.dto.MagicBagDto;
 import nus.iss.se.product.dto.MagicBagListResponse;
 import nus.iss.se.product.dto.UpdateMagicBagRequest;
+import nus.iss.se.product.enums.FileType;
+import nus.iss.se.product.service.FileUploadService;
 import nus.iss.se.product.service.IMagicBagService;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
-import jakarta.validation.Valid;
 import java.util.List;
 
 /**
@@ -28,6 +33,7 @@ public class MagicBagController {
     
     private final IMagicBagService magicBagService;
     private final UserContextHolder userContextHolder;
+    private final FileUploadService fileUploadService;
     
     /**
      * 获取所有盲盒列表（分页）
@@ -131,6 +137,16 @@ public class MagicBagController {
     public Result<Integer> batchDeleteMagicBags(@RequestBody List<Integer> ids) {
         int deletedCount = magicBagService.batchDeleteMagicBags(ids);
         return Result.success(deletedCount);
+    }
+    
+    /**
+     * 上传产品图片
+     */
+    @PostMapping("/upload-image")
+    @Operation(summary = "上传产品图片", description = "商户上传盲盒产品图片")
+    public Result<String> uploadProductImage(@RequestParam("file") MultipartFile file) {
+        FileUploadResponse response = fileUploadService.uploadFile(file, FileType.MAGIC_BAG_IMAGE);
+        return Result.success(response.getFileUrl());
     }
     
     @PostMapping("/batch-query")
