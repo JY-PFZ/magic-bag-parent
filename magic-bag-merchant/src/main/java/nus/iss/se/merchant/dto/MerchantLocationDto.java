@@ -1,12 +1,8 @@
-package nus.iss.se.product.dto;
+package nus.iss.se.merchant.dto;
 
 import lombok.Data;
 import java.math.BigDecimal;
 
-/**
- * Merchant Location DTO
- * 用于返回商户地理位置信息
- */
 @Data
 public class MerchantLocationDto {
     private String id;
@@ -16,4 +12,6 @@ public class MerchantLocationDto {
     private String unit;
     private Double distance;
 }
+
+
 

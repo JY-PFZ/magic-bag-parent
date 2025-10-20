@@ -60,6 +60,13 @@
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
         </dependency>
 
+        <!-- 依赖 merchant 模块以复用其 DTO -->
+        <dependency>
+            <groupId>nus.iss.se</groupId>
+            <artifactId>magic-bag-merchant</artifactId>
+            <version>${project.parent.version}</version>
+        </dependency>
+
         <!-- AWS SDK for Java -->
         <dependency>
             <groupId>software.amazon.awssdk</groupId>
