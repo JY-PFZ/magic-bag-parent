@@ -17,4 +17,6 @@ public interface IUserService extends IService<User> {
     UserDto getUserProfile(String username);
 
     void activateUser(String username);
+
+	UserDto getUserById(Integer id);
 }

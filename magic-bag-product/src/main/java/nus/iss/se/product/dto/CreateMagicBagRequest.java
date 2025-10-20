@@ -15,8 +15,7 @@ import java.util.Date;
 @Schema(description = "创建产品请求")
 public class CreateMagicBagRequest {
     
-    @NotNull(message = "商家ID不能为空")
-    @Schema(description = "商家ID", example = "1")
+    @Schema(description = "商家ID", example = "1", accessMode = Schema.AccessMode.READ_ONLY)
     private Integer merchantId;
     
     @NotBlank(message = "产品标题不能为空")

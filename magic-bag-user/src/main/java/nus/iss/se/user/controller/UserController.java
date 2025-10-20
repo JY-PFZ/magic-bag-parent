@@ -56,4 +56,12 @@ public class UserController {
     public Result<UserDto> getProfile(@PathVariable @NotBlank @Size(max = 50) String username){
         return Result.success(userService.getUserProfile(username));
     }
+    @GetMapping("profile/id/{id}")
+    public Result<UserDto> getProfileById(@PathVariable Integer id){
+        UserDto userDto = userService.getUserById(id);
+        if (userDto == null) {
+            return Result.error("User not found");
+        }
+        return Result.success(userDto);
+    }
 }

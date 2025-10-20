@@ -10,13 +10,18 @@ spring:
     import:
       - nacos:${spring.application.name}-${spring.profiles.active}.yaml?group=${spring.application.name}&refresh=true
       - nacos:shared-config.yaml?refresh=true
-
   cloud:
     nacos:
       username: nacos
       password: nacos
       discovery:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 54.169.196.90:8848
         group: MAGIC_BAG
       config:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 54.169.196.90:8848
+
+stripe:
+  api:
+    key: sk_test_51QkKIAFx9r3W1cEdHhvIXcgV4oTkl7vLuFDttGigZxNaTiiw4VR7nWFCQxssdTnzjgX2376tBdYNx9UniYJ00GwesjEGB
+app:
+  pay-url: http://localhost:10021
