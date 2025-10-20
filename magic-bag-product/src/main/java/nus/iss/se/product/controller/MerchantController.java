@@ -6,6 +6,8 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.Result;
+import nus.iss.se.common.cache.UserContext;
+import nus.iss.se.product.common.UserContextHolder;
 import nus.iss.se.product.dto.MerchantDto;
 import nus.iss.se.product.dto.MerchantUpdateDto;
 import nus.iss.se.product.service.IMerchantService;
@@ -24,6 +26,7 @@ import java.util.List;
 public class MerchantController {
     
     private final IMerchantService merchantService;
+    private final UserContextHolder userContextHolder;
     
     /**
      * 获取所有已审核的商户列表
@@ -53,9 +56,12 @@ public class MerchantController {
      */
     @PutMapping("/profile")
     @Operation(summary = "更新商户信息", description = "商户更新自己的店铺信息")
-    public Result<Void> updateMerchantProfile(@RequestBody @Valid MerchantUpdateDto merchantDto,
-                                            @RequestHeader("X-User-Id") Integer currentUserId) {
-        merchantService.updateMerchantProfile(merchantDto, currentUserId);
+    public Result<Void> updateMerchantProfile(@RequestBody @Valid MerchantUpdateDto merchantDto) {
+        UserContext currentUser = userContextHolder.getCurrentUser();
+        if (currentUser == null) {
+            return Result.error("用户未登录");
+        }
+        merchantService.updateMerchantProfile(merchantDto, currentUser.getId());
         return Result.success();
     }
     

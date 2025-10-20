@@ -16,3 +16,4 @@ public class MerchantLocationDto {
     private String unit;
     private Double distance;
 }
+

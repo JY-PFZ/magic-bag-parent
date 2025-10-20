@@ -25,3 +25,4 @@ public class MerchantUpdateDto {
     @Size(max = 255, message = "地址长度不能超过255个字符")
     private String address;
 }
+

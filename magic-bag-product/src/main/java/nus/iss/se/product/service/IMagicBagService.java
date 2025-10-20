@@ -36,6 +36,13 @@ public interface IMagicBagService {
     List<MagicBagDto> getMagicBagsByCategory(String category);
     
     /**
+     * 根据商户ID获取盲盒
+     * @param merchantId 商户ID
+     * @return 盲盒列表
+     */
+    List<MagicBagDto> getMagicBagsByMerchantId(Integer merchantId);
+    
+    /**
      * 创建新产品
      * @param request 创建产品请求
      * @return 创建的产品信息

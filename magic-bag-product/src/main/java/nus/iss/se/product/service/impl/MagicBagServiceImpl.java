@@ -69,6 +69,14 @@ public class MagicBagServiceImpl implements IMagicBagService {
     }
     
     @Override
+    public List<MagicBagDto> getMagicBagsByMerchantId(Integer merchantId) {
+        List<MagicBag> magicBags = magicBagMapper.findByMerchantId(merchantId);
+        return magicBags.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+    
+    @Override
     @Transactional(rollbackFor = Exception.class)
     public MagicBagDto createMagicBag(CreateMagicBagRequest request) {
         // 检查同一商家同一天是否有相同标题的产品

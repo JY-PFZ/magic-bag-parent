@@ -47,9 +47,12 @@ public class MerchantServiceImpl implements IMerchantService {
     
     @Override
     public Integer getMerchantIdByUserId(Integer userId) {
-        // 这里需要根据实际业务逻辑实现
-        // 可能需要通过用户表关联查询，或者有专门的用户-商户关联表
-        // 暂时返回null，需要根据实际数据库设计调整
+        // 根据业务逻辑，商户ID就是用户ID
+        // 商户表的主键ID对应用户ID
+        Merchant merchant = merchantMapper.selectById(userId);
+        if (merchant != null) {
+            return merchant.getId();
+        }
         return null;
     }
     

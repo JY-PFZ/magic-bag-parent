@@ -4,6 +4,8 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.Result;
+import nus.iss.se.common.cache.UserContext;
+import nus.iss.se.product.common.UserContextHolder;
 import nus.iss.se.product.dto.CreateMagicBagRequest;
 import nus.iss.se.product.dto.MagicBagDto;
 import nus.iss.se.product.dto.MagicBagListResponse;
@@ -25,6 +27,7 @@ import java.util.List;
 public class MagicBagController {
     
     private final IMagicBagService magicBagService;
+    private final UserContextHolder userContextHolder;
     
     /**
      * 获取所有盲盒列表（分页）
@@ -62,11 +65,29 @@ public class MagicBagController {
     }
     
     /**
+     * 根据商户ID获取盲盒
+     */
+    @GetMapping("/merchant/{merchantId}")
+    @Operation(summary = "按商户获取盲盒", description = "根据商户ID获取盲盒列表")
+    public Result<List<MagicBagDto>> getMagicBagsByMerchantId(@PathVariable Integer merchantId) {
+        List<MagicBagDto> magicBags = magicBagService.getMagicBagsByMerchantId(merchantId);
+        return Result.success(magicBags);
+    }
+    
+    /**
      * 创建新产品
      */
     @PostMapping
     @Operation(summary = "创建产品", description = "创建新的盲盒产品")
     public Result<MagicBagDto> createMagicBag(@Valid @RequestBody CreateMagicBagRequest request) {
+        UserContext currentUser = userContextHolder.getCurrentUser();
+        if (currentUser == null) {
+            return Result.error("用户未登录");
+        }
+        
+        // 从用户上下文获取商户ID，而不是让前端传递
+        request.setMerchantId(currentUser.getId());
+        
         MagicBagDto magicBag = magicBagService.createMagicBag(request);
         if (magicBag == null) {
             return Result.error("创建产品失败");
