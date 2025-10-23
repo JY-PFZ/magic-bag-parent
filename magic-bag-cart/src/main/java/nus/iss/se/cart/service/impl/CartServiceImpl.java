@@ -216,6 +216,7 @@ public class CartServiceImpl implements ICartService {
             double subtotal = bag.getPrice().doubleValue() * item.getQuantity();
             return new CartItemDto(
                 item.getCartItemId(),
+                item.getMagicBagId(),
                 bag.getTitle(),
                 bag.getPrice().doubleValue(),
                 item.getQuantity(),
@@ -311,6 +312,7 @@ public class CartServiceImpl implements ICartService {
             double subtotal = bag.getPrice().doubleValue() * item.getQuantity();
             return new CartItemDto(
                 item.getCartItemId(),
+                item.getMagicBagId(),
                 bag.getTitle(),
                 bag.getPrice().doubleValue(),
                 item.getQuantity(),
@@ -359,6 +361,7 @@ public class CartServiceImpl implements ICartService {
             double subtotal = bag.getPrice().doubleValue() * item.getQuantity();
             return new CartItemDto(
                 item.getCartItemId(),
+                item.getMagicBagId(),
                 bag.getTitle(),
                 bag.getPrice().doubleValue(),
                 item.getQuantity(),

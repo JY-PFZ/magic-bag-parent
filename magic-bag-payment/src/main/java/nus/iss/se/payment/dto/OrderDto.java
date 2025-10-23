@@ -3,6 +3,7 @@ package nus.iss.se.payment.dto;
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
+import java.util.List;
 
 @Data
 public class OrderDto {
@@ -25,4 +26,8 @@ public class OrderDto {
     private String userName;
     private String bagTitle;
     private String merchantName;
+    
+    // 订单类型和明细
+    private String orderType; // "single" 或 "cart"
+    private List<OrderItemDto> orderItems; // 购物车订单的商品明细
 }
