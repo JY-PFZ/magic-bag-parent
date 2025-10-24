@@ -13,6 +13,10 @@ public interface IMerchantService {
     MerchantDto getMerchantById(Integer id);
 
     Integer getMerchantIdByUserId(Integer userId);
+    
+    MerchantDto findByUserId(Integer userId);
+    
+    void registerMerchant(MerchantUpdateDto merchantDto, Integer userId);
 
     void updateMerchantProfile(MerchantUpdateDto merchantDto, Integer currentUserId);
 

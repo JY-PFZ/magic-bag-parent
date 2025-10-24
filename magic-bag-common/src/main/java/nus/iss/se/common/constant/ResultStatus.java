@@ -49,6 +49,8 @@ public enum ResultStatus {
     
     /* 商户错误：33001-33999 */ // 新增：商户相关错误
     MERCHANT_NOT_FOUND(33001, "Merchant Not Found"),
+    MERCHANT_HAS_EXISTED(33002, "Merchant Has Existed"),
+    ACCESS_DENIED(33003, "Access Denied"),
     
     /* 系统错误：40001-49999 */
     FILE_MAX_SIZE_OVERFLOW(40003, "上传尺寸过大"),
