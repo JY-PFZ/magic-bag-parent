@@ -42,6 +42,8 @@ COPY --from=builder /app/target/*.jar app.jar
 
 # 动态暴露端口（示例为占位符，实际构建时传入）
 ARG APP_PORT=8080
+ENV APP_PORT=${APP_PORT}
+
 EXPOSE ${APP_PORT}
 
 # 健康检查（假设服务提供 /actuator/health）
