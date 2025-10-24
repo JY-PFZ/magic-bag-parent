@@ -50,3 +50,5 @@ FROM order_items oi
 WHERE NOT EXISTS (
     SELECT 1 FROM magic_bags mb WHERE mb.id = oi.magic_bag_id
 );
+
+
