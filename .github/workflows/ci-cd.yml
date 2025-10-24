@@ -8,6 +8,11 @@ on:
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   NACOS_ADDR: "localhost:8848"
+  # CodeArtifact 配置
+  CODEARTIFACT_DOMAIN: "magic-bag"
+  CODEARTIFACT_REPO: "magic_bag"
+  CODEARTIFACT_OWNER: "838811708767"
+  AWS_REGION: "ap-southeast-1"
 
 jobs:
   deploy:
@@ -30,6 +35,50 @@ jobs:
       - name: 📥 Checkout
         uses: actions/checkout@v4
 
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔑 Generate CodeArtifact settings.xml
+        run: |
+          # 获取授权 token
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain ${{ env.CODEARTIFACT_DOMAIN }} \
+            --domain-owner ${{ env.CODEARTIFACT_OWNER }} \
+            --region ${{ env.AWS_REGION }} \
+            --query authorizationToken --output text)
+
+          # 创建 .m2 目录并写入 settings.xml
+          mkdir -p .m2
+          cat > .m2/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>codeartifact</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>default</id>
+                <repositories>
+                  <repository>
+                    <id>codeartifact</id>
+                    <url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>default</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+
       - name: ⚙️ Setup JDK 21
         uses: actions/setup-java@v4
         with:
@@ -40,7 +89,15 @@ jobs:
       - name: 🧪 Test
         run: |
           cd ${{ matrix.service.dir }}
-          mvn -B test
+          mvn -B test -s ../../.m2/settings.xml
+
+      - name: 🐳 Build Docker Image
+        run: |
+          docker build \
+            --build-arg SERVICE_NAME=${{ matrix.service.dir }} \
+            --build-arg APP_PORT=${{ matrix.service.port }} \
+            --build-arg TZ=Asia/Singapore \
+            -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest .
 
       - name: 🚪 Docker Login
         uses: docker/login-action@v3
@@ -48,18 +105,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 🐳 Build & Push Image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ${{ matrix.service.dir }}/Dockerfile
-          push: true
-          tags: |
-            ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest
-          build-args: |
-            APP_PORT=${{ matrix.service.port }}
-            TZ=Asia/Singapore
-            SERVICE_NAME=${{ matrix.service.name }}
+      - name: 📤 Push Image
+        run: |
+          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest
 
       - name: 📡 Deploy to EC2
         uses: appleboy/ssh-action@v1.0.3
@@ -68,14 +116,9 @@ jobs:
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            # 登录 Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-            # 停止旧容器
             docker stop ${{ matrix.service.name }} || true
             docker rm ${{ matrix.service.name }} || true
-
-            # 运行新容器（模拟 docker-compose）
             docker run -d \
               --name ${{ matrix.service.name }} \
               -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
