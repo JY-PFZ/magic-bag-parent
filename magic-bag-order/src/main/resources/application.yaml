@@ -20,3 +20,9 @@ spring:
         group: MAGIC_BAG
       config:
         server-addr: 54.169.196.90:8848  # Nacos??????
+
+  s3:
+    region: ap-southeast-1
+    bucket-name: magic-bag-oss
+    aws-access-key-id: AKIA4GTIS5VPZG663G5D
+    aws-secret-access-key: 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

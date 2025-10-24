@@ -27,6 +27,9 @@ aws:
     bucket: magic-bag-files-838811708767
     region: ap-southeast-1
     domain: https://magic-bag-files-838811708767.s3.ap-southeast-1.amazonaws.com
+    # AWS凭证配置（可选，如果不配置则使用默认凭证链）
+    aws-access-key-id: ${AWS_ACCESS_KEY_ID:}
+    aws-secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
 
 # 文件上传配置
 file:
