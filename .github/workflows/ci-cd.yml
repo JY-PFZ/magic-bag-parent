@@ -1,4 +1,4 @@
-name: Microservices CI/CD → Docker Hub + EC2 (Compose)
+name: Microservices CI/CD → Docker Hub + EC2 (with existing docker-compose.yml)
 
 on:
   push:
@@ -10,21 +10,21 @@ env:
   AWS_REGION: "ap-southeast-1"
 
 jobs:
-  build-and-push:
-    name: 🐳 Build & Push All Images
+  build-and-deploy:
+    name: 🐳 Build, Push & Deploy via Docker Compose
     runs-on: ubuntu-latest
     steps:
-      - name: 📥 Checkout
+      - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Configure AWS Credentials
+      - name: ⚙️ Configure AWS Credentials (for CodeArtifact)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      - name: 🔑 Generate CodeArtifact settings.xml
+      - name: 🔑 Generate CodeArtifact Maven Settings
         run: |
           TOKEN=$(aws codeartifact get-authorization-token \
             --domain magic-bag --domain-owner 838811708767 --region ${{ env.AWS_REGION }} \
@@ -32,9 +32,27 @@ jobs:
           mkdir -p .m2
           cat > .m2/settings.xml << EOF
           <settings>
-            <servers><server><id>codeartifact</id><username>aws</username><password>${TOKEN}</password></server></servers>
-            <profiles><profile><id>default</id><repositories><repository><id>codeartifact</id><url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url></repository></repositories></profile></profiles>
-            <activeProfiles><activeProfile>default</activeProfile></activeProfiles>
+            <servers>
+              <server>
+                <id>codeartifact</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>default</id>
+                <repositories>
+                  <repository>
+                    <id>codeartifact</id>
+                    <url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url>
+                  </repository>
+                </repositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>default</activeProfile>
+            </activeProfiles>
           </settings>
           EOF
 
@@ -44,8 +62,10 @@ jobs:
           java-version: '21'
           distribution: 'temurin'
           cache: 'maven'
+          server-id: codeartifact
+          settings-path: .m2/settings.xml
 
-      - name: 🧪 Test & Build All Services
+      - name: 🧪 Build & Push Docker Images
         run: |
           SERVICES=(
             "magic-bag-gateway:10016:magic-bag-gateway"
@@ -61,6 +81,7 @@ jobs:
 
           for svc in "${SERVICES[@]}"; do
             IFS=':' read -r NAME PORT DIR <<< "$svc"
+            echo "📦 Building $NAME..."
             mvn -B -pl "$DIR" test -s .m2/settings.xml
             docker build -f "$DIR/Dockerfile" \
               --build-arg SERVICE_NAME="$DIR" \
@@ -70,27 +91,36 @@ jobs:
             docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$NAME":latest
           done
 
-      - name: 📤 Deploy via Docker Compose on EC2
+      - name: 🔐 Docker Login (for Compose pull)
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: 🚀 Deploy to EC2 via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
-            mkdir -p /home/ubuntu/app
-            cd /home/ubuntu/app
+            # 进入 docker-compose 所在目录（你已放好的位置）
+            cd /home/ubuntu
 
-            # 从 GitHub 下载 docker-compose.yml（确保使用 image 而非 build）
-            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml" \
-              -o docker-compose.yml
-
-            # 登录 Docker Hub
+            # 登录 Docker Hub（使用 token）
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
 
-            # 拉取新镜像并重启服务
+            # 关键：先 down 再 up，避免容器名冲突
+            docker-compose down
+
+            # 拉取最新镜像（对应 docker-compose.yml 中的 image:xxx）
             docker-compose pull
+
+            # 后台启动所有服务
             docker-compose up -d
 
-            # 清理无用镜像
+            # 可选：清理无用镜像
             docker image prune -f
+
+            # 查看运行状态
+            docker-compose ps
