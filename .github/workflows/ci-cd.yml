@@ -139,19 +139,19 @@ jobs:
 
             # 停止并清理旧容器（避免 container_name 冲突）
             echo "🛑 Stopping old services..."
-            docker-compose down
+            docker compose down
 
             # 拉取最新镜像
             echo "📥 Pulling latest images..."
-            docker-compose pull
+            docker compose pull
 
             # 启动新服务
             echo "🟢 Starting services..."
-            docker-compose up -d
+            docker compose up -d
 
             # 清理无用镜像
             docker image prune -f
 
             # 显示运行状态
             echo "📊 Current status:"
-            docker-compose ps
+            docker compose ps
