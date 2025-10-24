@@ -16,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -26,31 +27,31 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class MagicBagServiceImpl implements IMagicBagService {
-    
+
     private final MagicBagMapper magicBagMapper;
-    
+
     @Override
     public MagicBagListResponse getAllMagicBags(Integer page, Integer size) {
         Page<MagicBag> magicBagPage = new Page<>(page, size);
         QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("is_active", true);
-        
+
         Page<MagicBag> result = magicBagMapper.selectPage(magicBagPage, queryWrapper);
-        
+
         List<MagicBagDto> magicBagDtos = result.getRecords().stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
-        
+
         MagicBagListResponse response = new MagicBagListResponse();
         response.setMagicBags(magicBagDtos);
         response.setTotalItems(result.getTotal());
         response.setCurrentPage((int) result.getCurrent());
         response.setPageSize((int) result.getSize());
         response.setTotalPages((int) result.getPages());
-        
+
         return response;
     }
-    
+
     @Override
     public MagicBagDto getMagicBagById(Integer id) {
         MagicBag magicBag = magicBagMapper.selectById(id);
@@ -59,7 +60,7 @@ public class MagicBagServiceImpl implements IMagicBagService {
         }
         return convertToDto(magicBag);
     }
-    
+
     @Override
     public List<MagicBagDto> getMagicBagsByCategory(String category) {
         List<MagicBag> magicBags = magicBagMapper.findByCategory(category);
@@ -67,7 +68,7 @@ public class MagicBagServiceImpl implements IMagicBagService {
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
-    
+
     @Override
     public List<MagicBagDto> getMagicBagsByMerchantId(Integer merchantId) {
         List<MagicBag> magicBags = magicBagMapper.findByMerchantId(merchantId);
@@ -75,7 +76,7 @@ public class MagicBagServiceImpl implements IMagicBagService {
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MagicBagDto createMagicBag(CreateMagicBagRequest request) {
@@ -84,27 +85,27 @@ public class MagicBagServiceImpl implements IMagicBagService {
         queryWrapper.eq("merchant_id", request.getMerchantId())
                    .eq("available_date", request.getAvailableDate())
                    .eq("title", request.getTitle());
-        
+
         MagicBag existingBag = magicBagMapper.selectOne(queryWrapper);
         if (existingBag != null) {
             return null;
         }
-        
+
         // 创建新产品
         MagicBag magicBag = new MagicBag();
         BeanUtils.copyProperties(request, magicBag);
         magicBag.setIsActive(true);
         magicBag.setCreatedAt(LocalDateTime.now());
         magicBag.setUpdatedAt(LocalDateTime.now());
-        
+
         int result = magicBagMapper.insert(magicBag);
         if (result <= 0) {
             return null;
         }
-        
+
         return convertToDto(magicBag);
     }
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public MagicBagDto updateMagicBag(Integer id, UpdateMagicBagRequest request) {
@@ -113,11 +114,11 @@ public class MagicBagServiceImpl implements IMagicBagService {
         if (existingBag == null) {
             return null;
         }
-        
+
         // 更新产品信息
         UpdateWrapper<MagicBag> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("id", id);
-        
+
         if (request.getTitle() != null) {
             updateWrapper.set("title", request.getTitle());
         }
@@ -148,19 +149,19 @@ public class MagicBagServiceImpl implements IMagicBagService {
         if (request.getIsActive() != null) {
             updateWrapper.set("is_active", request.getIsActive());
         }
-        
+
         updateWrapper.set("updated_at", LocalDateTime.now());
-        
+
         int result = magicBagMapper.update(null, updateWrapper);
         if (result <= 0) {
             return null;
         }
-        
+
         // 返回更新后的产品信息
         MagicBag updatedBag = magicBagMapper.selectById(id);
         return convertToDto(updatedBag);
     }
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public boolean deleteMagicBag(Integer id) {
@@ -169,60 +170,68 @@ public class MagicBagServiceImpl implements IMagicBagService {
         if (existingBag == null) {
             return false;
         }
-        
+
         // 软删除：设置 is_active = false
         UpdateWrapper<MagicBag> updateWrapper = new UpdateWrapper<>();
         updateWrapper.eq("id", id)
                     .set("is_active", false)
                     .set("updated_at", LocalDateTime.now());
-        
+
         int result = magicBagMapper.update(null, updateWrapper);
         if (result <= 0) {
             return false;
         }
-        
+
         return true;
     }
-    
+
     @Override
     @Transactional(rollbackFor = Exception.class)
     public int batchDeleteMagicBags(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
             return 0;
         }
-        
+
         // 批量软删除
         UpdateWrapper<MagicBag> updateWrapper = new UpdateWrapper<>();
         updateWrapper.in("id", ids)
                     .set("is_active", false)
                     .set("updated_at", LocalDateTime.now());
-        
+
         int result = magicBagMapper.update(null, updateWrapper);
         return result;
     }
-    
+
     @Override
     public List<MagicBagDto> getBatchByIds(List<Integer> ids) {
         if (ids == null || ids.isEmpty()) {
             return List.of();
         }
-        
+
         // 使用 MyBatis-Plus 的批量查询
         List<MagicBag> magicBags = magicBagMapper.selectBatchIds(ids);
-        
+
         return magicBags.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());
     }
-    
+
     /**
      * 将实体转换为DTO
      * @param magicBag 实体对象
      * @return DTO对象
      */
     private MagicBagDto convertToDto(MagicBag magicBag) {
+        if (magicBag == null) {
+            return null;
+        }
         MagicBagDto dto = new MagicBagDto();
+        // 首先，自动复制所有其他名称和类型匹配的字段
         BeanUtils.copyProperties(magicBag, dto);
+
+        // 手动处理 price 字段的类型转换 (从 Float 到 BigDecimal)
+        dto.setPrice(BigDecimal.valueOf(magicBag.getPrice()));
+
         return dto;
     }
 }
