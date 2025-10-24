@@ -55,6 +55,12 @@ public interface IOrderService {
      */
     OrderStatsDto getOrderStats(UserContext currentUser);
     
+    /**
+     * 从购物车创建订单
+     * @param userId 用户ID
+     * @return 创建的订单信息
+     */
+    OrderDto createOrderFromCart(Integer userId);
     
     void updateOrderStatusInternal(Integer orderId, String newStatus);
 }

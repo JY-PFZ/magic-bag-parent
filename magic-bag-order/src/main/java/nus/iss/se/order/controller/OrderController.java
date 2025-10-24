@@ -168,6 +168,26 @@ public class OrderController {
     }
     
     /**
+     * 从购物车创建订单
+     */
+    @PostMapping("/from-cart")
+    @PreAuthorize("hasRole('USER')")
+    @Operation(summary = "从购物车创建订单", description = "将购物车中的商品转换为订单")
+    public Result<OrderDto> createOrderFromCart() {
+        log.info("Creating order from cart");
+        
+        try {
+            UserContext currentUser = getCurrentUser();
+            OrderDto order = orderService.createOrderFromCart(currentUser.getId());
+            log.info("Order created from cart successfully: orderId={}", order.getId());
+            return Result.success(order);
+        } catch (Exception e) {
+            log.error("Error creating order from cart: {}", e.getMessage(), e);
+            throw e;
+        }
+    }
+    
+    /**
      * 内部接口：更新订单状态（供 payment-service 通过 Feign 调用）
      * 不需要权限验证，不需要 UserContext
      */

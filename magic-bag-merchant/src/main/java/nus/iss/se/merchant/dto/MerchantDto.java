@@ -1,13 +1,9 @@
-package nus.iss.se.product.dto;
+package nus.iss.se.merchant.dto;
 
 import lombok.Data;
 import java.math.BigDecimal;
 import java.util.Date;
 
-/**
- * Merchant DTO
- * 用于返回商户信息
- */
 @Data
 public class MerchantDto {
     private Integer id;
@@ -23,3 +19,6 @@ public class MerchantDto {
     private Date updatedAt;
     private Date approvedAt;
 }
+
+
+

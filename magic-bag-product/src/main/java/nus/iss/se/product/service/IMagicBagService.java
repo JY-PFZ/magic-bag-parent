@@ -58,14 +58,14 @@ public interface IMagicBagService {
     MagicBagDto updateMagicBag(Integer id, UpdateMagicBagRequest request);
     
     /**
-     * 删除产品（软删除）
+     * 删除产品
      * @param id 产品ID
      * @return 是否删除成功
      */
     boolean deleteMagicBag(Integer id);
     
     /**
-     * 批量删除产品（软删除）
+     * 批量删除产品
      * @param ids 产品ID列表
      * @return 删除成功的数量
      */

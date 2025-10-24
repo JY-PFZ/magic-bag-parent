@@ -7,20 +7,26 @@ import lombok.extern.slf4j.Slf4j;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.constant.ResultStatus;
 import nus.iss.se.common.cache.UserContext;
+import nus.iss.se.order.api.CartClient;
 import nus.iss.se.order.api.MerchantClient;
 import nus.iss.se.order.api.ProductClient;
 import nus.iss.se.order.api.UserClient;
 import nus.iss.se.common.exception.BusinessException;
 import nus.iss.se.order.dto.*;
+import nus.iss.se.merchant.dto.MerchantDto;
 import nus.iss.se.order.entity.Order;
+import nus.iss.se.order.entity.OrderItem;
 import nus.iss.se.order.entity.OrderVerification;
 import nus.iss.se.order.mapper.OrderMapper;
+import nus.iss.se.order.mapper.OrderItemMapper;
 import nus.iss.se.order.mapper.OrderVerificationMapper;
 import nus.iss.se.order.service.IOrderService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -35,9 +41,11 @@ public class OrderServiceImpl implements IOrderService {
     
     private final OrderMapper orderMapper;
     private final OrderVerificationMapper orderVerificationMapper;
+    private final OrderItemMapper orderItemMapper;
     private final ProductClient productClient;
     private final UserClient userClient;
     private final MerchantClient merchantClient;
+    private final CartClient cartClient;
     
     @Override
     public IPage<OrderDto> getOrders(UserContext currentUser, OrderQueryDto queryDto) {
@@ -472,5 +480,142 @@ public class OrderServiceImpl implements IOrderService {
      */
     private boolean isResultSuccess(Result<?> result) {
         return result != null && result.getCode() == ResultStatus.SUCCESS.getCode();
+    }
+    
+    @Override
+    @Transactional
+    public OrderDto createOrderFromCart(Integer userId) {
+        log.info("Creating order from cart for user: {}", userId);
+        
+        // 1. 通过 CartClient 获取购物车
+        Result<CartDto> cartResult = cartClient.getActiveCart(userId);
+        if (!isResultSuccess(cartResult) || cartResult.getData() == null) {
+            throw new BusinessException(ResultStatus.DATA_IS_WRONG);
+        }
+        
+        CartDto cart = cartResult.getData();
+        if (cart.getItems() == null || cart.getItems().isEmpty()) {
+            throw new BusinessException(ResultStatus.DATA_IS_WRONG);
+        }
+        
+        // 2. 计算总价
+        BigDecimal totalPrice = cart.getItems().stream()
+                .map(item -> BigDecimal.valueOf(item.getSubtotal()))
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+        
+        // 3. 创建主订单
+        Order order = new Order();
+        order.setOrderNo(generateOrderNo());
+        order.setUserId(userId);
+        order.setOrderType("cart");
+        order.setTotalPrice(totalPrice);
+        order.setStatus("pending");
+        order.setPickupCode(generatePickupCode());
+        order.setCreatedAt(new Date());
+        order.setUpdatedAt(new Date());
+        
+        // 设置自提时间（使用第一个商品的自提时间）
+        if (!cart.getItems().isEmpty()) {
+            CartItemDto firstItem = cart.getItems().get(0);
+            try {
+                Result<MagicBagDto> bagResult = productClient.getMagicBagById(firstItem.getMagicBagId());
+                if (isResultSuccess(bagResult) && bagResult.getData() != null) {
+                    // 转换LocalTime为Date（使用当前日期）
+                    java.time.LocalDate today = java.time.LocalDate.now();
+                    order.setPickupStartTime(java.sql.Date.valueOf(today));
+                    order.setPickupEndTime(java.sql.Date.valueOf(today));
+                }
+            } catch (Exception e) {
+                log.warn("Failed to get magic bag info for pickup time: {}", e.getMessage());
+            }
+        }
+        
+        orderMapper.insert(order);
+        log.info("Main order created: orderId={}, orderNo={}", order.getId(), order.getOrderNo());
+        
+        // 4. 创建订单明细
+        for (CartItemDto item : cart.getItems()) {
+            OrderItem orderItem = new OrderItem();
+            orderItem.setOrderId(order.getId());
+            orderItem.setMagicBagId(item.getMagicBagId());
+            orderItem.setQuantity(item.getQuantity());
+            orderItem.setUnitPrice(BigDecimal.valueOf(item.getPrice()));
+            orderItem.setSubtotal(BigDecimal.valueOf(item.getSubtotal()));
+            orderItem.setCreatedAt(LocalDateTime.now());
+            orderItemMapper.insert(orderItem);
+        }
+        
+        log.info("Created {} order items for order: {}", cart.getItems().size(), order.getId());
+        
+        // 5. 通过 CartClient 清空购物车
+        try {
+            Result<Void> clearResult = cartClient.clearCart(userId);
+            if (!isResultSuccess(clearResult)) {
+                log.warn("Failed to clear cart for user: {}", userId);
+            } else {
+                log.info("Cart cleared successfully for user: {}", userId);
+            }
+        } catch (Exception e) {
+            log.error("Error clearing cart for user {}: {}", userId, e.getMessage());
+        }
+        
+        // 6. 返回订单信息
+        return convertToOrderDto(order);
+    }
+    
+    /**
+     * 生成订单号
+     */
+    private String generateOrderNo() {
+        return "ORD" + System.currentTimeMillis();
+    }
+    
+    /**
+     * 生成自提码
+     */
+    private String generatePickupCode() {
+        return String.valueOf((int) (Math.random() * 9000) + 1000);
+    }
+    
+    /**
+     * 转换订单实体为DTO
+     */
+    private OrderDto convertToOrderDto(Order order) {
+        OrderDto dto = new OrderDto();
+        BeanUtils.copyProperties(order, dto);
+        
+        // 如果是购物车订单，查询订单明细
+        if ("cart".equals(order.getOrderType())) {
+            List<OrderItem> orderItems = orderItemMapper.findByOrderId(order.getId());
+            List<OrderItemDto> itemDtos = orderItems.stream()
+                    .map(this::convertToOrderItemDto)
+                    .collect(Collectors.toList());
+            dto.setOrderItems(itemDtos);
+        }
+        
+        return dto;
+    }
+    
+    /**
+     * 转换订单明细实体为DTO
+     */
+    private OrderItemDto convertToOrderItemDto(OrderItem orderItem) {
+        OrderItemDto dto = new OrderItemDto();
+        BeanUtils.copyProperties(orderItem, dto);
+        
+        // 查询商品信息
+        try {
+            Result<MagicBagDto> bagResult = productClient.getMagicBagById(orderItem.getMagicBagId());
+            if (isResultSuccess(bagResult) && bagResult.getData() != null) {
+                MagicBagDto magicBag = bagResult.getData();
+                dto.setMagicBagTitle(magicBag.getTitle());
+                dto.setMagicBagImageUrl(magicBag.getImageUrl());
+                dto.setMagicBagCategory(magicBag.getCategory());
+            }
+        } catch (Exception e) {
+            log.warn("Failed to get magic bag info for order item: {}", e.getMessage());
+        }
+        
+        return dto;
     }
 }

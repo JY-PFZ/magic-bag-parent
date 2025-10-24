@@ -1,4 +1,4 @@
-package nus.iss.se.order.api;
+package nus.iss.se.cart.api;
 
 import nus.iss.se.common.Result;
 import nus.iss.se.merchant.dto.MerchantDto;
@@ -8,7 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 
 /**
  * Merchant服务Feign客户端
- * 用于订单服务调用商户信息
+ * 用于购物车服务调用商户信息
  */
 @FeignClient(name = "magic-bag-merchant")
 public interface MerchantClient {

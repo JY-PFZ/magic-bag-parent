@@ -9,11 +9,10 @@ import org.springframework.context.annotation.ComponentScan;
 import org.springframework.kafka.annotation.EnableKafka;
 
 @EnableKafka
-@SpringBootApplication
-@EnableFeignClients
+@SpringBootApplication(scanBasePackages = {"nus.iss.se.product", "nus.iss.se.common"})
+@EnableFeignClients(basePackages = "nus.iss.se.product.api")
 @EnableDiscoveryClient
 @EnableConfigurationProperties
-@ComponentScan("nus.iss.se.*")
 public class MagicBagProductApplication {
 
     public static void main(String[] args) {

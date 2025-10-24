@@ -1,4 +1,4 @@
-package nus.iss.se.cart.dto;
+package nus.iss.se.order.dto;
 
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -13,3 +13,4 @@ public class CartItemDto {
     private int quantity;
     private double subtotal;
 }
+

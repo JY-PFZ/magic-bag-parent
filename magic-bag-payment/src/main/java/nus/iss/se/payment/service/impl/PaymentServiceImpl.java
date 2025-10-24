@@ -114,24 +114,49 @@ public class PaymentServiceImpl implements IPaymentService {
         
         // 创建 Stripe Checkout Session
         try {
-            SessionCreateParams params = SessionCreateParams.builder()
+            SessionCreateParams.Builder paramsBuilder = SessionCreateParams.builder()
                     .setMode(SessionCreateParams.Mode.PAYMENT)
                     .setSuccessUrl(payUrl + "/payment/success?orderId=" + orderId + "&session_id={CHECKOUT_SESSION_ID}")
                     .setCancelUrl(payUrl + "/payment/cancel?orderId=" + orderId)
-                    .addLineItem(SessionCreateParams.LineItem.builder()
-                            .setQuantity(order.getQuantity().longValue())
-                            .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
-                                    .setCurrency("sgd")
-                                    .setUnitAmount(amountInCents / order.getQuantity())
-                                    .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
-                                            .setName(bagTitle)
-                                            .build())
-                                    .build())
-                            .build())
                     .addPaymentMethodType(SessionCreateParams.PaymentMethodType.CARD)
                     .putMetadata("orderId", orderId.toString())
-                    .putMetadata("orderNo", order.getOrderNo())
-                    .build();
+                    .putMetadata("orderNo", order.getOrderNo());
+            
+            // 根据订单类型创建不同的支付项目
+            if ("cart".equals(order.getOrderType()) && order.getOrderItems() != null && !order.getOrderItems().isEmpty()) {
+                // 购物车订单：为每个商品创建支付项目
+                for (OrderItemDto item : order.getOrderItems()) {
+                    String itemTitle = item.getMagicBagTitle() != null ? item.getMagicBagTitle() : "Magic Bag";
+                    long unitAmountInCents = item.getUnitPrice().multiply(BigDecimal.valueOf(100)).longValue();
+                    
+                    paramsBuilder.addLineItem(SessionCreateParams.LineItem.builder()
+                            .setQuantity(item.getQuantity().longValue())
+                            .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
+                                    .setCurrency("sgd")
+                                    .setUnitAmount(unitAmountInCents)
+                                    .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                            .setName(itemTitle)
+                                            .build())
+                                    .build())
+                            .build());
+                }
+            } else {
+                // 单商品订单：使用原有逻辑
+                long unitAmountInCents = amountInCents / order.getQuantity();
+                
+                paramsBuilder.addLineItem(SessionCreateParams.LineItem.builder()
+                        .setQuantity(order.getQuantity().longValue())
+                        .setPriceData(SessionCreateParams.LineItem.PriceData.builder()
+                                .setCurrency("sgd")
+                                .setUnitAmount(unitAmountInCents)
+                                .setProductData(SessionCreateParams.LineItem.PriceData.ProductData.builder()
+                                        .setName(bagTitle)
+                                        .build())
+                                .build())
+                        .build());
+            }
+            
+            SessionCreateParams params = paramsBuilder.build();
             
             Session session = Session.create(params);
             
@@ -211,7 +236,7 @@ public class PaymentServiceImpl implements IPaymentService {
                     orderId, sessionStatus, paymentStatus);
             
             if ("complete".equals(sessionStatus) && "paid".equals(paymentStatus)) {
-                // ✅ 支付成功，通过 Feign 调用 order-service 更新订单状态
+                // 支付成功，通过 Feign 调用 order-service 更新订单状态
                 try {
                     Result<Void> updateResult = orderClient.updateOrderStatus(orderId, "paid");
                     
