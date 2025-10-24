@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.Date;
@@ -22,7 +23,7 @@ public class MagicBag {
     private Integer merchantId;
     private String title;
     private String description;
-    private Float price;
+    private BigDecimal price;
     private Integer quantity;
     private LocalTime pickupStartTime;
     private LocalTime pickupEndTime;
