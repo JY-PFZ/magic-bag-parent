@@ -7,7 +7,7 @@ on:
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  NACOS_ADDR: "54.169.196.90:8848"
+  NACOS_ADDR: "3.1.213.148:8848"
   # CodeArtifact 配置
   CODEARTIFACT_DOMAIN: "magic-bag"
   CODEARTIFACT_REPO: "magic_bag"
