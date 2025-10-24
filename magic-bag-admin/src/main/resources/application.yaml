@@ -17,7 +17,7 @@ spring:
       username: nacos
       password: nacos
       discovery:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 3.1.213.148:8848
         group: MAGIC_BAG
       config:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 3.1.213.148:8848
