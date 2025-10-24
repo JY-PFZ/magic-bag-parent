@@ -138,3 +138,4 @@ public class SimpleFileUploadController {
         return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
     }
 }
+

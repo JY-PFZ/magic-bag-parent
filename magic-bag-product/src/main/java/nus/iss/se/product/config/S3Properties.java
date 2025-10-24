@@ -16,3 +16,4 @@ public class S3Properties {
     private String awsAccessKeyId;
     private String awsSecretAccessKey;
 }
+
