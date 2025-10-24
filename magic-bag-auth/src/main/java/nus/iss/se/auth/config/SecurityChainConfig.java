@@ -44,6 +44,7 @@ public class SecurityChainConfig {
                         .requestMatchers("/auth/*","/api/public/**").permitAll()
                         .requestMatchers("/swagger-ui/**","/v3/api-docs/**","/swagger-resources/**").permitAll()
                         .requestMatchers("/webjars/**").permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
                         .requestMatchers(HttpMethod.OPTIONS).permitAll()  // 放行 OPTIONS 预检
                         .anyRequest().authenticated()
                 )
