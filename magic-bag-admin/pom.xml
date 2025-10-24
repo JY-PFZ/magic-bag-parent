@@ -9,9 +9,9 @@
         <relativePath>../pom.xml</relativePath>
     </parent>
 
-    <artifactId>magic-bag-payment</artifactId>
-    <name>magic-bag-payment</name>
-    <description>magic-bag-payment</description>
+    <artifactId>magic-bag-admin</artifactId>
+    <name>magic-bag-admin</name>
+    <description>magic-bag-admin</description>
 
     <dependencies>
         <!-- Web 基础依赖-->
@@ -27,6 +27,7 @@
             <version>${project.parent.version}</version>
         </dependency>
 
+        <!-- kafka 基础模块-->
         <dependency>
             <groupId>nus.iss.se</groupId>
             <artifactId>magic-bag-kafka-starter</artifactId>
@@ -58,18 +59,6 @@
         <dependency>
             <groupId>com.alibaba.cloud</groupId>
             <artifactId>spring-cloud-starter-alibaba-nacos-discovery</artifactId>
-        </dependency>
-        
-         <dependency>
-            <groupId>com.stripe</groupId>
-            <artifactId>stripe-java</artifactId>
-            <version>22.18.0</version>
-        </dependency>
-
-        <!-- OpenFeign 客户端 -->
-        <dependency>
-            <groupId>org.springframework.cloud</groupId>
-            <artifactId>spring-cloud-starter-openfeign</artifactId>
         </dependency>
     </dependencies>
 

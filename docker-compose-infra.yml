@@ -1,0 +1,64 @@
+services:
+  nacos:
+    image: nacos/nacos-server:v3.1.0
+    container_name: nacos
+    ports:
+      - "8848:8848"
+      - "8080:8080"
+      - "9848:9848"
+    environment:
+      - MODE=standalone
+      - NACOS_AUTH_TOKEN=k3b8Xq1v2Zm9Yp6Wn5Lr8As3Dx7Cv1Bn9Mq4Xs8Vj2Kp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4Am8Nq1Vp5Lw9Zt6Eq4A==
+      - NACOS_AUTH_IDENTITY_KEY=nacos
+      - NACOS_AUTH_IDENTITY_VALUE=nacos
+      - NACOS_SERVER_IP=0.0.0.0
+      - NACOS_APPLICATION_HOST=0.0.0.0
+
+  kafka:
+    image: confluentinc/cp-kafka:7.9.4  # 使用 Confluent Platform 提供的 Kafka 镜像
+    container_name: kafka  # 容器名称
+    ports: # 映射端口，使主机可以访问容器服务
+      - "9092:9092"  # 外部应用连接使用的端口
+      - "9093:9093"  # 控制器内部通信使用的端口
+    environment: # 环境变量设置
+      CLUSTER_ID: "41pFNxwDT3a-zUAdkJU4cA"  # Kafka 集群 ID，必须替换为你自己的生成值
+      KAFKA_NODE_ID: 1  # 当前节点的唯一标识符
+      KAFKA_PROCESS_ROLES: "broker,controller"  # 节点角色，KRaft 模式下同时作为 broker 和 controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: "1@kafka:9093"  # 控制器投票成员列表，格式为 <node_id>@<host>:<port>
+      KAFKA_LISTENERS:
+        PLAINTEXT://:29092,
+        PLAINTEXT_HOST://:9092,
+        CONTROLLER://:9093      # 容器内部 broker 通信端口，暴露给本地的客户端端口控制器 Raft 协议端口
+      KAFKA_ADVERTISED_LISTENERS:
+        PLAINTEXT://kafka:29092,
+        PLAINTEXT_HOST://localhost:9092  # 容器间通信地址，本地客户端访问地址
+      KAFKA_CONTROLLER_LISTENER_NAMES: "CONTROLLER"  # 控制器专用的监听器名称
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT,PLAINTEXT_HOST:PLAINTEXT"  # 协议映射
+
+      KAFKA_LOG_DIRS: "/var/lib/kafka/data"  # 日志存储目录
+
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1  # 偏移量主题复制因子
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1  # 事务状态日志复制因子
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1  # 最小同步副本数
+
+    volumes: # 挂载卷，用于持久化数据
+      - ./kafka-data:/var/lib/kafka/data  # 将宿主机的 ./kafka-data 目录挂载到容器内的 /var/lib/kafka/data
+    networks:
+      - kafka-network
+
+  kafka-ui:
+    image: provectuslabs/kafka-ui:v0.7.2
+    container_name: kafka-ui
+    depends_on:
+      - kafka
+    ports:
+      - "10010:8080"
+    environment:
+      KAFKA_CLUSTERS_0_NAME: local
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+    networks:
+      - kafka-network
+
+networks:
+  kafka-network:
+    driver: bridge
