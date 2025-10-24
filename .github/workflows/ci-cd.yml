@@ -89,7 +89,7 @@ jobs:
       - name: 🧪 Test
         run: |
           cd ${{ matrix.service.dir }}
-          mvn -B test -s ../../.m2/settings.xml
+          mvn -B test -s ../.m2/settings.xml
 
       - name: 🐳 Build Docker Image
         run: |
