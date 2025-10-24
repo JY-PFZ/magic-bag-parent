@@ -1,7 +1,7 @@
 package nus.iss.se.admin.common;
 
 import lombok.RequiredArgsConstructor;
-import nus.iss.se.cart.common.UserContextInterceptor;
+import nus.iss.se.admin.common.UserContextInterceptor;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.servlet.config.annotation.InterceptorRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;

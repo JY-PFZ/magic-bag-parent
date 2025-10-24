@@ -13,7 +13,7 @@ import nus.iss.se.order.api.ProductClient;
 import nus.iss.se.order.api.UserClient;
 import nus.iss.se.common.exception.BusinessException;
 import nus.iss.se.order.dto.*;
-import nus.iss.se.merchant.dto.MerchantDto;
+import nus.iss.se.order.dto.MerchantDto;
 import nus.iss.se.order.entity.Order;
 import nus.iss.se.order.entity.OrderItem;
 import nus.iss.se.order.entity.OrderVerification;

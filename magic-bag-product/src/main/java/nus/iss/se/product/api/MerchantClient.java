@@ -2,8 +2,8 @@ package nus.iss.se.product.api;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import nus.iss.se.common.Result;
-import nus.iss.se.merchant.dto.MerchantDto;
-import nus.iss.se.merchant.dto.MerchantUpdateDto;
+import nus.iss.se.product.dto.MerchantDto;
+import nus.iss.se.product.dto.MerchantUpdateDto;
 import org.springframework.cloud.openfeign.FeignClient;
 import org.springframework.web.bind.annotation.*;
 
