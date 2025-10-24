@@ -87,13 +87,12 @@ jobs:
           cache: 'maven'
 
       - name: 🧪 Test
-        run: |
-          cd ${{ matrix.service.dir }}
-          mvn -B test -s ../.m2/settings.xml
+        run: mvn -B -pl ${{ matrix.service.dir }} test -s .m2/settings.xml
 
       - name: 🐳 Build Docker Image
         run: |
           docker build \
+            -f ${{ matrix.service.dir }}/Dockerfile \
             --build-arg SERVICE_NAME=${{ matrix.service.dir }} \
             --build-arg APP_PORT=${{ matrix.service.port }} \
             --build-arg TZ=Asia/Singapore \
