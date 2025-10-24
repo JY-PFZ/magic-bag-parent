@@ -1,4 +1,4 @@
-name: Microservices CI/CD → Docker Hub + EC2
+name: Microservices CI/CD → Docker Hub + EC2 (Compose)
 
 on:
   push:
@@ -7,30 +7,12 @@ on:
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
-  NACOS_ADDR: "3.1.213.148:8848"
-  # CodeArtifact 配置
-  CODEARTIFACT_DOMAIN: "magic-bag"
-  CODEARTIFACT_REPO: "magic_bag"
-  CODEARTIFACT_OWNER: "838811708767"
   AWS_REGION: "ap-southeast-1"
 
 jobs:
-  deploy:
-    name: Deploy ${{ matrix.service.name }}
+  build-and-push:
+    name: 🐳 Build & Push All Images
     runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        service:
-          - { name: "magic-bag-gateway",   port: "10016", dir: "magic-bag-gateway" }
-          - { name: "magic-bag-auth",      port: "10017", dir: "magic-bag-auth" }
-          - { name: "magic-bag-user",      port: "10018", dir: "magic-bag-user" }
-          - { name: "magic-bag-product",   port: "10019", dir: "magic-bag-product" }
-          - { name: "magic-bag-order",     port: "10020", dir: "magic-bag-order" }
-          - { name: "magic-bag-payment",   port: "10021", dir: "magic-bag-payment" }
-          - { name: "magic-bag-cart",      port: "10022", dir: "magic-bag-cart" }
-          - { name: "magic-bag-merchant",  port: "10023", dir: "magic-bag-merchant" }
-          - { name: "magic-bag-admin",     port: "10024", dir: "magic-bag-admin" }
-
     steps:
       - name: 📥 Checkout
         uses: actions/checkout@v4
@@ -44,38 +26,15 @@ jobs:
 
       - name: 🔑 Generate CodeArtifact settings.xml
         run: |
-          # 获取授权 token
           TOKEN=$(aws codeartifact get-authorization-token \
-            --domain ${{ env.CODEARTIFACT_DOMAIN }} \
-            --domain-owner ${{ env.CODEARTIFACT_OWNER }} \
-            --region ${{ env.AWS_REGION }} \
+            --domain magic-bag --domain-owner 838811708767 --region ${{ env.AWS_REGION }} \
             --query authorizationToken --output text)
-
-          # 创建 .m2 目录并写入 settings.xml
           mkdir -p .m2
           cat > .m2/settings.xml << EOF
           <settings>
-            <servers>
-              <server>
-                <id>codeartifact</id>
-                <username>aws</username>
-                <password>${TOKEN}</password>
-              </server>
-            </servers>
-            <profiles>
-              <profile>
-                <id>default</id>
-                <repositories>
-                  <repository>
-                    <id>codeartifact</id>
-                    <url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url>
-                  </repository>
-                </repositories>
-              </profile>
-            </profiles>
-            <activeProfiles>
-              <activeProfile>default</activeProfile>
-            </activeProfiles>
+            <servers><server><id>codeartifact</id><username>aws</username><password>${TOKEN}</password></server></servers>
+            <profiles><profile><id>default</id><repositories><repository><id>codeartifact</id><url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url></repository></repositories></profile></profiles>
+            <activeProfiles><activeProfile>default</activeProfile></activeProfiles>
           </settings>
           EOF
 
@@ -86,44 +45,52 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: 🧪 Test
-        run: mvn -B -pl ${{ matrix.service.dir }} test -s .m2/settings.xml
-
-      - name: 🐳 Build Docker Image
+      - name: 🧪 Test & Build All Services
         run: |
-          docker build \
-            -f ${{ matrix.service.dir }}/Dockerfile \
-            --build-arg SERVICE_NAME=${{ matrix.service.dir }} \
-            --build-arg APP_PORT=${{ matrix.service.port }} \
-            --build-arg TZ=Asia/Singapore \
-            -t ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest .
+          SERVICES=(
+            "magic-bag-gateway:10016:magic-bag-gateway"
+            "magic-bag-auth:10017:magic-bag-auth"
+            "magic-bag-user:10018:magic-bag-user"
+            "magic-bag-product:10019:magic-bag-product"
+            "magic-bag-order:10020:magic-bag-order"
+            "magic-bag-payment:10021:magic-bag-payment"
+            "magic-bag-cart:10022:magic-bag-cart"
+            "magic-bag-merchant:10023:magic-bag-merchant"
+            "magic-bag-admin:10024:magic-bag-admin"
+          )
 
-      - name: 🚪 Docker Login
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
+          for svc in "${SERVICES[@]}"; do
+            IFS=':' read -r NAME PORT DIR <<< "$svc"
+            mvn -B -pl "$DIR" test -s .m2/settings.xml
+            docker build -f "$DIR/Dockerfile" \
+              --build-arg SERVICE_NAME="$DIR" \
+              --build-arg APP_PORT="$PORT" \
+              --build-arg TZ=Asia/Singapore \
+              -t ${{ secrets.DOCKERHUB_USERNAME }}/"$NAME":latest .
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$NAME":latest
+          done
 
-      - name: 📤 Push Image
-        run: |
-          docker push ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest
-
-      - name: 📡 Deploy to EC2
+      - name: 📤 Deploy via Docker Compose on EC2
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.EC2_HOST }}
           username: ${{ secrets.EC2_USER }}
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
+            mkdir -p /home/ubuntu/app
+            cd /home/ubuntu/app
+
+            # 从 GitHub 下载 docker-compose.yml（确保使用 image 而非 build）
+            curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://raw.githubusercontent.com/${{ github.repository }}/main/docker-compose.yml" \
+              -o docker-compose.yml
+
+            # 登录 Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-            docker stop ${{ matrix.service.name }} || true
-            docker rm ${{ matrix.service.name }} || true
-            docker run -d \
-              --name ${{ matrix.service.name }} \
-              -p ${{ matrix.service.port }}:${{ matrix.service.port }} \
-              -v /home/${{ secrets.EC2_USER }}/.keys:/app/.keys:ro \
-              -e SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=${{ env.NACOS_ADDR }} \
-              -e SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=${{ env.NACOS_ADDR }} \
-              -e SPRING_PROFILES_ACTIVE=dev \
-              -e JAVA_OPTS="-Xmx384m -Xms256m" \
-              ${{ secrets.DOCKERHUB_USERNAME }}/${{ matrix.service.name }}:latest
+
+            # 拉取新镜像并重启服务
+            docker-compose pull
+            docker-compose up -d
+
+            # 清理无用镜像
+            docker image prune -f

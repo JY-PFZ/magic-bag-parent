@@ -1,153 +1,128 @@
+version: '3.8'
+
 services:
   magic-bag-gateway:
-    build:
-      context: .
-      dockerfile: magic-bag-gateway/Dockerfile
-      args:
-        APP_PORT: 10016
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-gateway
+    image: pfz16/magic-bag-gateway:latest
+    container_name: magic-bag-gateway
     ports:
       - "10016:10016"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-auth:
-    build:
-      context: .
-      dockerfile: magic-bag-auth/Dockerfile
-      args:
-        APP_PORT: 10017
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-auth
+    image: pfz16/magic-bag-auth:latest
+    container_name: magic-bag-auth
     ports:
       - "10017:10017"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-user:
-    build:
-      context: .
-      dockerfile: magic-bag-user/Dockerfile
-      args:
-        APP_PORT: 10018
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-user
+    image: pfz16/magic-bag-user:latest
+    container_name: magic-bag-user
     ports:
       - "10018:10018"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-product:
-    build:
-      context: .
-      dockerfile: magic-bag-product/Dockerfile
-      args:
-        APP_PORT: 10019
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-product
+    image: pfz16/magic-bag-product:latest
+    container_name: magic-bag-product
     ports:
       - "10019:10019"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-order:
-    build:
-      context: .
-      dockerfile: magic-bag-order/Dockerfile
-      args:
-        APP_PORT: 10020
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-order
+    image: pfz16/magic-bag-order:latest
+    container_name: magic-bag-order
     ports:
       - "10020:10020"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-payment:
-    build:
-      context: .
-      dockerfile: magic-bag-payment/Dockerfile
-      args:
-        APP_PORT: 10021
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-payment
+    image: pfz16/magic-bag-payment:latest
+    container_name: magic-bag-payment
     ports:
       - "10021:10021"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-cart:
-    build:
-      context: .
-      dockerfile: magic-bag-cart/Dockerfile
-      args:
-        APP_PORT: 10022
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-cart
+    image: pfz16/magic-bag-cart:latest
+    container_name: magic-bag-cart
     ports:
       - "10022:10022"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-merchant:
-    build:
-      context: .
-      dockerfile: magic-bag-merchant/Dockerfile
-      args:
-        APP_PORT: 10023
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-merchant
+    image: pfz16/magic-bag-merchant:latest
+    container_name: magic-bag-merchant
     ports:
       - "10023:10023"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
 
   magic-bag-admin:
-    build:
-      context: .
-      dockerfile: magic-bag-admin/Dockerfile
-      args:
-        APP_PORT: 10024
-        TZ: Asia/Singapore
-        SERVICE_NAME: magic-bag-admin
+    image: pfz16/magic-bag-admin:latest
+    container_name: magic-bag-admin
     ports:
       - "10024:10024"
     volumes:
-      - ~/Code/magic-bag-parent/.keys:/app/.keys:ro   # 将宿主机的 .keys 挂载到容器的 /.keys
+      - /home/ubuntu/.keys:/app/.keys:ro
     environment:
-      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=54.169.196.90:8848
-      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=54.169.196.90:8848
+      - SPRING_CLOUD_NACOS_CONFIG_SERVER_ADDR=3.1.213.148:8848
+      - SPRING_CLOUD_NACOS_DISCOVERY_SERVER_ADDR=3.1.213.148:8848
       - SPRING_PROFILES_ACTIVE=dev
+      - JAVA_OPTS=-Xmx384m -Xms256m
+    restart: unless-stopped
