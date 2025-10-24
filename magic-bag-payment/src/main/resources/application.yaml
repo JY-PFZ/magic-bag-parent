@@ -24,4 +24,4 @@ stripe:
   api:
     key: sk_test_51QkKIAFx9r3W1cEdHhvIXcgV4oTkl7vLuFDttGigZxNaTiiw4VR7nWFCQxssdTnzjgX2376tBdYNx9UniYJ00GwesjEGB
 app:
-  pay-url: 13.215.158.65:10021
+  pay-url: 13.215.158.65:10016
