@@ -42,8 +42,10 @@ jobs:
             --query authorizationToken --output text)
 
           echo "📝 Writing ~/.m2/settings.xml..."
-          mkdir -p ~/.m2
-          cat > ~/.m2/settings.xml << EOF
+#          mkdir -p ~/.m2
+#          cat > ~/.m2/settings.xml << EOF
+          mkdir -p .m2
+          cat > .m2/settings.xml << EOF
           <settings>
             <servers>
               <server>
