@@ -22,7 +22,6 @@ import java.util.Optional;
 @Slf4j
 public class S3StorageService {
 
-    @Qualifier("s3StorageClient")
     private final S3Client s3Client;
     private final S3Properties s3Properties;
 

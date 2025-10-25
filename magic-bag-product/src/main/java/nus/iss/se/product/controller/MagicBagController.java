@@ -39,7 +39,7 @@ public class MagicBagController {
     
     private final IMagicBagService magicBagService;
     private final UserContextHolder userContextHolder;
-    private final FileUploadService fileUploadService;
+//    private final FileUploadService fileUploadService;
     private final S3StorageService s3StorageService;
     
     /**

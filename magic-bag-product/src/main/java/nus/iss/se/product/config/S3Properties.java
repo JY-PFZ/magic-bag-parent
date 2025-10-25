@@ -9,7 +9,7 @@ import org.springframework.stereotype.Component;
  */
 @Data
 @Component
-@ConfigurationProperties(prefix = "aws.s3")
+@ConfigurationProperties(prefix = "common.s3")
 public class S3Properties {
     private String region;
     private String bucketName;
