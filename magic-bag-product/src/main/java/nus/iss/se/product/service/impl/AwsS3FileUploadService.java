@@ -13,6 +13,7 @@ import nus.iss.se.product.entity.FileInfo;
 import nus.iss.se.product.enums.FileType;
 import nus.iss.se.product.mapper.FileInfoMapper;
 import nus.iss.se.product.service.FileUploadService;
+import nus.iss.se.product.service.S3StorageService;
 import nus.iss.se.product.validator.FileValidator;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -39,6 +40,7 @@ public class AwsS3FileUploadService implements FileUploadService {
     private final S3Client s3Client;
     private final S3Presigner s3Presigner;
     private final AwsS3Config s3Properties;
+    private final S3StorageService s3StorageService;
     private final FileInfoMapper fileInfoMapper;
     private final UserContextHolder userContextHolder;
     private final FileValidator fileValidator;
@@ -105,11 +107,8 @@ public class AwsS3FileUploadService implements FileUploadService {
                 return false;
             }
             
-            // 从S3删除文件
-            s3Client.deleteObject(builder -> builder
-                .bucket(s3Properties.getBucket())
-                .key(fileInfo.getS3Key())
-            );
+            // 使用S3StorageService删除文件
+            s3StorageService.delete(fileInfo.getS3Key());
             
             // 从数据库删除记录
             fileInfoMapper.deleteById(fileInfo.getId());
@@ -124,16 +123,8 @@ public class AwsS3FileUploadService implements FileUploadService {
     
     private void uploadToS3(MultipartFile file, String filePath) {
         try {
-            PutObjectRequest putObjectRequest = PutObjectRequest.builder()
-                .bucket(s3Properties.getBucket())
-                .key(filePath)
-                .contentType(file.getContentType())
-                .contentLength(file.getSize())
-                .build();
-            
-            s3Client.putObject(putObjectRequest, 
-                RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
-                
+            // 使用S3StorageService进行上传
+            s3StorageService.upload(filePath, file.getBytes(), file.getContentType());
             log.info("文件上传成功: {}", filePath);
         } catch (Exception e) {
             log.error("文件上传失败: {}", filePath, e);

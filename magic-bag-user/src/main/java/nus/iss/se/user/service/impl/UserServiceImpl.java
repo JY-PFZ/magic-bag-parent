@@ -1,6 +1,9 @@
 package nus.iss.se.user.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
+import com.baomidou.mybatisplus.core.metadata.IPage;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.constant.ResultStatus;
@@ -23,10 +26,14 @@ import org.springframework.stereotype.Service;
 import java.util.Optional;
 
 @Service
-@RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
     private final PasswordEncoder passwordEncoder;
     private final KafkaEventPublisher eventPublisher;
+    
+    public UserServiceImpl(PasswordEncoder passwordEncoder, KafkaEventPublisher eventPublisher) {
+        this.passwordEncoder = passwordEncoder;
+        this.eventPublisher = eventPublisher;
+    }
 
     @Override
     public User findByUsername(String username) {
@@ -103,5 +110,23 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
         UserDto dto = new UserDto();
         BeanUtils.copyProperties(user, dto);
         return dto;
+    }
+    
+    @Override
+    public IPage<User> getUserList(int pageNum, int pageSize, String role) {
+        Page<User> page = new Page<>(pageNum, pageSize);
+        
+        LambdaQueryWrapper<User> queryWrapper = new LambdaQueryWrapper<>();
+        
+        // 如果指定了角色，添加角色过滤条件
+        if (StringUtils.isNotBlank(role)) {
+            queryWrapper.eq(User::getRole, role);
+        }
+        
+        // 排除密码字段，按创建时间倒序排列
+        queryWrapper.select(User.class, info -> !info.getColumn().equals("password"))
+                   .orderByDesc(User::getCreatedAt);
+        
+        return this.page(page, queryWrapper);
     }
 }

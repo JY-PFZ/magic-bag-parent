@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.mail.MessagingException;
+import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -14,6 +15,7 @@ import nus.iss.se.auth.api.UserClient;
 import nus.iss.se.auth.common.MyUserDetails;
 import nus.iss.se.auth.dto.LoginReq;
 import nus.iss.se.auth.service.EmailService;
+import nus.iss.se.auth.util.BaseUtil;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.cache.TokenCacheService;
 import nus.iss.se.common.cache.UserCacheService;
@@ -87,6 +89,28 @@ public class Controller {
         response.setContentType("application/json;charset=UTF-8");
         response.setHeader("X-New-Token", token);
 
+        return Result.success();
+    }
+
+    @PostMapping("/logout")
+    @Operation(summary = "user logout", description = "Delete user's token on redis")
+    public Result<String> logout(HttpServletRequest request) {
+        String token = BaseUtil.getTokenFromRequest(request);
+        if (token != null) {
+            // 从 JWT 解析用户名
+            String username = jwtUtil.getClaims(token).getSubject();
+            
+            // 1. Redis 标记 token 失效
+            tokenCacheService.revokeToken(token);
+            
+            // 2. 清除用户信息上下文和redis缓存
+            userCacheService.deleteUserCache(username);
+            
+            // 3. 调用用户服务清除用户缓存
+            userClient.evictUser(username);
+            
+            log.info("User logout: {}", username);
+        }
         return Result.success();
     }
 

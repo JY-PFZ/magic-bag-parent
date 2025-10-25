@@ -5,6 +5,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.cache.UserContext;
 import nus.iss.se.product.common.UserContextHolder;
@@ -16,15 +17,20 @@ import nus.iss.se.product.dto.UpdateMagicBagRequest;
 import nus.iss.se.product.enums.FileType;
 import nus.iss.se.product.service.FileUploadService;
 import nus.iss.se.product.service.IMagicBagService;
+import nus.iss.se.product.service.S3StorageService;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * MagicBag 控制器
  * 提供盲盒相关的REST API接口
  */
+@Slf4j
 @RestController
 @RequestMapping("/product/magic-bags")
 @RequiredArgsConstructor
@@ -34,6 +40,7 @@ public class MagicBagController {
     private final IMagicBagService magicBagService;
     private final UserContextHolder userContextHolder;
     private final FileUploadService fileUploadService;
+    private final S3StorageService s3StorageService;
     
     /**
      * 获取所有盲盒列表（分页）
@@ -140,13 +147,43 @@ public class MagicBagController {
     }
     
     /**
-     * 上传产品图片
+     * 上传产品图片 - 简化版本
      */
     @PostMapping("/upload-image")
     @Operation(summary = "上传产品图片", description = "商户上传盲盒产品图片")
     public Result<String> uploadProductImage(@RequestParam("file") MultipartFile file) {
-        FileUploadResponse response = fileUploadService.uploadFile(file, FileType.MAGIC_BAG_IMAGE);
-        return Result.success(response.getFileUrl());
+        try {
+            // 验证文件
+            if (file.isEmpty()) {
+                return Result.error("文件不能为空");
+            }
+            
+            // 验证文件类型
+            String contentType = file.getContentType();
+            if (contentType == null || !contentType.startsWith("image/")) {
+                return Result.error("只支持图片文件");
+            }
+            
+            // 验证文件大小 (5MB)
+            if (file.getSize() > 5 * 1024 * 1024) {
+                return Result.error("文件大小不能超过5MB");
+            }
+            
+            // 生成文件路径
+            String filePath = generateImagePath(file.getOriginalFilename());
+            
+            // 上传到S3
+            s3StorageService.upload(filePath, file.getBytes(), contentType);
+            
+            // 获取文件URL
+            String fileUrl = s3StorageService.getPublicUrl(filePath);
+            
+            return Result.success(fileUrl);
+            
+        } catch (Exception e) {
+            log.error("图片上传失败", e);
+            return Result.error("图片上传失败: " + e.getMessage());
+        }
     }
     
     @PostMapping("/batch-query")
@@ -157,6 +194,27 @@ public class MagicBagController {
         }
         List<MagicBagDto> magicBags = magicBagService.getBatchByIds(ids);
         return Result.success(magicBags);
+    }
+    
+    /**
+     * 生成图片文件路径
+     */
+    private String generateImagePath(String originalFilename) {
+        String fileId = UUID.randomUUID().toString();
+        String extension = getFileExtension(originalFilename);
+        String datePath = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyy/MM/dd"));
+        
+        return String.format("magic-bag-images/%s/%s.%s", datePath, fileId, extension);
+    }
+    
+    /**
+     * 获取文件扩展名
+     */
+    private String getFileExtension(String filename) {
+        if (filename == null || !filename.contains(".")) {
+            return "jpg";
+        }
+        return filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
     }
     
 }

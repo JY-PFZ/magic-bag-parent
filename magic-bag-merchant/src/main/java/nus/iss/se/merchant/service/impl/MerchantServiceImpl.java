@@ -49,6 +49,40 @@ public class MerchantServiceImpl implements IMerchantService {
         }
         return null;
     }
+    
+    @Override
+    public MerchantDto findByUserId(Integer userId) {
+        Merchant merchant = merchantMapper.findByUserId(userId);
+        if (merchant == null) {
+            return null;
+        }
+        return convertToDto(merchant);
+    }
+    
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void registerMerchant(MerchantUpdateDto merchantDto, Integer userId) {
+        // 检查是否已经注册过商户
+        Merchant existingMerchant = merchantMapper.findByUserId(userId);
+        if (existingMerchant != null) {
+            throw new BusinessException(ResultStatus.MERCHANT_HAS_EXISTED, "用户已经注册过商户");
+        }
+        
+        Merchant merchant = new Merchant();
+        merchant.setUserId(userId);
+        merchant.setName(merchantDto.getName());
+        merchant.setPhone(merchantDto.getPhone());
+        merchant.setBusinessLicense(merchantDto.getBusinessLicense());
+        merchant.setAddress(merchantDto.getAddress());
+        merchant.setStatus("pending"); // 待审核状态
+        merchant.setCreatedAt(new Date());
+        merchant.setUpdatedAt(new Date());
+        
+        int result = merchantMapper.insert(merchant);
+        if (result <= 0) {
+            throw new BusinessException(ResultStatus.FAIL, "注册商户失败");
+        }
+    }
 
     @Override
     @Transactional(rollbackFor = Exception.class)

@@ -98,18 +98,42 @@ public class OrderServiceImpl implements IOrderService {
                 log.info("Admin accessing order: {}", orderId);
                 break;
             case "MERCHANT":
-                if (order.getBagId() != null) {
-                    Result<MagicBagDto> bagResult = productClient.getMagicBagById(order.getBagId());
-                    if (!isResultSuccess(bagResult) || bagResult.getData() == null) {
-                        log.error("Product not found when verifying merchant access: bagId={}", order.getBagId());
-                        throw new BusinessException(ResultStatus.PRODUCT_NOT_FOUND);
-                    }
-                    if (!bagResult.getData().getMerchantId().equals(currentUser.getId())) {
-                        log.error("Merchant {} attempted to access order {} of another merchant", 
+                if ("cart".equals(order.getOrderType())) {
+                    // 多件商品订单：通过 order_items 验证权限
+                    List<OrderItem> orderItems = orderItemMapper.findByOrderId(orderId);
+                    boolean hasPermission = orderItems.stream()
+                        .anyMatch(item -> {
+                            try {
+                                Result<MagicBagDto> bagResult = productClient.getMagicBagById(item.getMagicBagId());
+                                return isResultSuccess(bagResult) && 
+                                       bagResult.getData() != null &&
+                                       bagResult.getData().getMerchantId().equals(currentUser.getId());
+                            } catch (Exception e) {
+                                log.warn("Error checking merchant permission for item {}: {}", item.getMagicBagId(), e.getMessage());
+                                return false;
+                            }
+                        });
+                    if (!hasPermission) {
+                        log.error("Merchant {} attempted to access cart order {} without permission", 
                                 currentUser.getId(), orderId);
                         throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
                     }
-                    log.info("Merchant {} accessing their order: {}", currentUser.getId(), orderId);
+                    log.info("Merchant {} accessing their cart order: {}", currentUser.getId(), orderId);
+                } else {
+                    // 单件商品订单：使用原有逻辑
+                    if (order.getBagId() != null) {
+                        Result<MagicBagDto> bagResult = productClient.getMagicBagById(order.getBagId());
+                        if (!isResultSuccess(bagResult) || bagResult.getData() == null) {
+                            log.error("Product not found when verifying merchant access: bagId={}", order.getBagId());
+                            throw new BusinessException(ResultStatus.PRODUCT_NOT_FOUND);
+                        }
+                        if (!bagResult.getData().getMerchantId().equals(currentUser.getId())) {
+                            log.error("Merchant {} attempted to access order {} of another merchant", 
+                                    currentUser.getId(), orderId);
+                            throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
+                        }
+                        log.info("Merchant {} accessing their order: {}", currentUser.getId(), orderId);
+                    }
                 }
                 break;
             case "USER":
@@ -404,48 +428,99 @@ public class OrderServiceImpl implements IOrderService {
         }
         
         // 查询魔法袋信息（通过 Product 服务）
-        if (order.getBagId() != null) {
-            try {
-                Result<MagicBagDto> bagResult = productClient.getMagicBagById(order.getBagId());
-                if (isResultSuccess(bagResult) && bagResult.getData() != null) {
-                    MagicBagDto bag = bagResult.getData();
-                    OrderDetailResponse.MagicBagInfo bagInfo = new OrderDetailResponse.MagicBagInfo();
-                    bagInfo.setId(bag.getId());
-                    bagInfo.setTitle(bag.getTitle());
-                    bagInfo.setDescription(bag.getDescription());
-                    bagInfo.setCategory(bag.getCategory());
-                    bagInfo.setImageUrl(bag.getImageUrl());
-                    response.setMagicBag(bagInfo);
-                    log.debug("Magic bag info added to order detail: bagId={}", bag.getId());
-                    
-                    // 查询商家信息（通过 Merchant 服务）
-                    if (bag.getMerchantId() != null) {
-                        try {
-                            Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
-                            if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
-                                MerchantDto merchant = merchantResult.getData();
-                                OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
-                                merchantInfo.setId(merchant.getId());
-                                merchantInfo.setName(merchant.getName());
-                                merchantInfo.setPhone(merchant.getPhone());
-                                merchantInfo.setAddress(merchant.getAddress());
-                                response.setMerchant(merchantInfo);
-                                log.debug("Merchant info added to order detail: merchantId={}", merchant.getId());
-                            } else {
-                                log.warn("Failed to get merchant info for order {}: merchantId={}", 
-                                        order.getId(), bag.getMerchantId());
+        if ("cart".equals(order.getOrderType())) {
+            // 多件商品订单：通过 order_items 获取主要商品信息
+            List<OrderItem> orderItems = orderItemMapper.findByOrderId(order.getId());
+            if (!orderItems.isEmpty()) {
+                OrderItem firstItem = orderItems.get(0);
+                try {
+                    Result<MagicBagDto> bagResult = productClient.getMagicBagById(firstItem.getMagicBagId());
+                    if (isResultSuccess(bagResult) && bagResult.getData() != null) {
+                        MagicBagDto bag = bagResult.getData();
+                        OrderDetailResponse.MagicBagInfo bagInfo = new OrderDetailResponse.MagicBagInfo();
+                        bagInfo.setId(bag.getId());
+                        bagInfo.setTitle(bag.getTitle());
+                        bagInfo.setDescription(bag.getDescription());
+                        bagInfo.setCategory(bag.getCategory());
+                        bagInfo.setImageUrl(bag.getImageUrl());
+                        response.setMagicBag(bagInfo);
+                        log.debug("Magic bag info added to cart order detail: bagId={}", bag.getId());
+                        
+                        // 查询商家信息（通过 Merchant 服务）
+                        if (bag.getMerchantId() != null) {
+                            try {
+                                Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
+                                if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
+                                    MerchantDto merchant = merchantResult.getData();
+                                    OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
+                                    merchantInfo.setId(merchant.getId());
+                                    merchantInfo.setName(merchant.getName());
+                                    merchantInfo.setPhone(merchant.getPhone());
+                                    merchantInfo.setAddress(merchant.getAddress());
+                                    response.setMerchant(merchantInfo);
+                                    log.debug("Merchant info added to cart order detail: merchantId={}", merchant.getId());
+                                } else {
+                                    log.warn("Failed to get merchant info for cart order {}: merchantId={}", 
+                                            order.getId(), bag.getMerchantId());
+                                }
+                            } catch (Exception e) {
+                                log.error("Error fetching merchant info for cart order {}: {}", 
+                                        order.getId(), e.getMessage());
                             }
-                        } catch (Exception e) {
-                            log.error("Error fetching merchant info for order {}: {}", 
-                                    order.getId(), e.getMessage());
                         }
+                    } else {
+                        log.warn("Failed to get magic bag info for cart order {}: bagId={}", 
+                                order.getId(), firstItem.getMagicBagId());
                     }
-                } else {
-                    log.warn("Failed to get magic bag info for order {}: bagId={}", 
-                            order.getId(), order.getBagId());
+                } catch (Exception e) {
+                    log.error("Error fetching magic bag info for cart order {}: {}", order.getId(), e.getMessage());
                 }
-            } catch (Exception e) {
-                log.error("Error fetching magic bag info for order {}: {}", order.getId(), e.getMessage());
+            }
+        } else {
+            // 单件商品订单：使用原有逻辑
+            if (order.getBagId() != null) {
+                try {
+                    Result<MagicBagDto> bagResult = productClient.getMagicBagById(order.getBagId());
+                    if (isResultSuccess(bagResult) && bagResult.getData() != null) {
+                        MagicBagDto bag = bagResult.getData();
+                        OrderDetailResponse.MagicBagInfo bagInfo = new OrderDetailResponse.MagicBagInfo();
+                        bagInfo.setId(bag.getId());
+                        bagInfo.setTitle(bag.getTitle());
+                        bagInfo.setDescription(bag.getDescription());
+                        bagInfo.setCategory(bag.getCategory());
+                        bagInfo.setImageUrl(bag.getImageUrl());
+                        response.setMagicBag(bagInfo);
+                        log.debug("Magic bag info added to order detail: bagId={}", bag.getId());
+                        
+                        // 查询商家信息（通过 Merchant 服务）
+                        if (bag.getMerchantId() != null) {
+                            try {
+                                Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
+                                if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
+                                    MerchantDto merchant = merchantResult.getData();
+                                    OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
+                                    merchantInfo.setId(merchant.getId());
+                                    merchantInfo.setName(merchant.getName());
+                                    merchantInfo.setPhone(merchant.getPhone());
+                                    merchantInfo.setAddress(merchant.getAddress());
+                                    response.setMerchant(merchantInfo);
+                                    log.debug("Merchant info added to order detail: merchantId={}", merchant.getId());
+                                } else {
+                                    log.warn("Failed to get merchant info for order {}: merchantId={}", 
+                                            order.getId(), bag.getMerchantId());
+                                }
+                            } catch (Exception e) {
+                                log.error("Error fetching merchant info for order {}: {}", 
+                                        order.getId(), e.getMessage());
+                            }
+                        }
+                    } else {
+                        log.warn("Failed to get magic bag info for order {}: bagId={}", 
+                                order.getId(), order.getBagId());
+                    }
+                } catch (Exception e) {
+                    log.error("Error fetching magic bag info for order {}: {}", order.getId(), e.getMessage());
+                }
             }
         }
         
@@ -514,9 +589,12 @@ public class OrderServiceImpl implements IOrderService {
         order.setCreatedAt(new Date());
         order.setUpdatedAt(new Date());
         
-        // 设置自提时间（使用第一个商品的自提时间）
+        // 设置 bag_id 和自提时间（使用第一个商品的信息）
         if (!cart.getItems().isEmpty()) {
             CartItemDto firstItem = cart.getItems().get(0);
+            order.setBagId(firstItem.getMagicBagId());
+            log.info("Set bag_id for cart order: {}", firstItem.getMagicBagId());
+            
             try {
                 Result<MagicBagDto> bagResult = productClient.getMagicBagById(firstItem.getMagicBagId());
                 if (isResultSuccess(bagResult) && bagResult.getData() != null) {
@@ -584,13 +662,38 @@ public class OrderServiceImpl implements IOrderService {
         OrderDto dto = new OrderDto();
         BeanUtils.copyProperties(order, dto);
         
-        // 如果是购物车订单，查询订单明细
         if ("cart".equals(order.getOrderType())) {
+            // 多件商品订单：查询订单明细
             List<OrderItem> orderItems = orderItemMapper.findByOrderId(order.getId());
             List<OrderItemDto> itemDtos = orderItems.stream()
                     .map(this::convertToOrderItemDto)
                     .collect(Collectors.toList());
             dto.setOrderItems(itemDtos);
+            
+            // 设置主要商品信息（用于显示）
+            if (!orderItems.isEmpty()) {
+                OrderItem firstItem = orderItems.get(0);
+                try {
+                    Result<MagicBagDto> bagResult = productClient.getMagicBagById(firstItem.getMagicBagId());
+                    if (isResultSuccess(bagResult) && bagResult.getData() != null) {
+                        MagicBagDto bag = bagResult.getData();
+                        dto.setBagTitle(bag.getTitle());
+                        
+                        // 获取商户名称
+                        if (bag.getMerchantId() != null) {
+                            Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
+                            if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
+                                dto.setMerchantName(merchantResult.getData().getName());
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    log.warn("Failed to get bag info for cart order {}: {}", order.getId(), e.getMessage());
+                }
+            }
+        } else {
+            // 单件商品订单：使用原有逻辑
+            // 这里可以添加单件商品订单的额外处理逻辑
         }
         
         return dto;

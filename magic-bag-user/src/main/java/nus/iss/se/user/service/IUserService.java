@@ -1,5 +1,6 @@
 package nus.iss.se.user.service;
 
+import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.service.IService;
 import nus.iss.se.user.dto.RegisterReq;
 import nus.iss.se.user.dto.UserDto;
@@ -18,5 +19,7 @@ public interface IUserService extends IService<User> {
 
     void activateUser(String username);
 
-	UserDto getUserById(Integer id);
+    UserDto getUserById(Integer id);
+    
+    IPage<User> getUserList(int pageNum, int pageSize, String role);
 }
