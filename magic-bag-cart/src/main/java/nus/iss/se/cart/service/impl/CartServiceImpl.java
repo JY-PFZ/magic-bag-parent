@@ -83,7 +83,7 @@ public class CartServiceImpl implements ICartService {
         // 使用 QueryWrapper 检查购物车中是否已存在该商品
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magicbag_id", magicBagId);
+                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
         CartItem existing = cartItemMapper.selectOne(queryWrapper);
         
         if (existing != null) {
@@ -129,7 +129,7 @@ public class CartServiceImpl implements ICartService {
         
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magicbag_id", magicBagId);
+                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
         CartItem item = cartItemMapper.selectOne(queryWrapper);
         
         if (item == null) {
@@ -168,7 +168,7 @@ public class CartServiceImpl implements ICartService {
         
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magicbag_id", magicBagId);
+                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
         CartItem item = cartItemMapper.selectOne(queryWrapper);
         
         if (item != null) {
@@ -318,7 +318,7 @@ public class CartServiceImpl implements ICartService {
     public List<CartItemDto> getCartItemsByMagicBagId(Integer magicBagId) {
         // 使用 QueryWrapper 查询
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("magicbag_id", magicBagId);
+        queryWrapper.eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
         List<CartItem> items = cartItemMapper.selectList(queryWrapper);
         
         if (items.isEmpty()) {

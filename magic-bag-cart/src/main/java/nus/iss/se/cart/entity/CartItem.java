@@ -1,6 +1,7 @@
 package nus.iss.se.cart.entity;
 
 import com.baomidou.mybatisplus.annotation.IdType;
+import com.baomidou.mybatisplus.annotation.TableField;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -24,7 +25,8 @@ public class CartItem {
     private Integer cartItemId;
 
     private Integer cartId;
-
+    
+    @TableField("magic_bag_id")
     private Integer magicBagId;
 
     private int quantity;
