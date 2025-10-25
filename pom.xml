@@ -11,7 +11,7 @@
 
     <groupId>nus.iss.se</groupId>
     <artifactId>magic-bag-parent</artifactId>
-    <version>1.0.0</version>
+    <version>1.1.0</version>
     <name>magic-bag-parent</name>
     <packaging>pom</packaging>
     <description>magic-bag-parent</description>
