@@ -20,21 +20,3 @@ spring:
         group: MAGIC_BAG
       config:
         server-addr: 3.1.213.148:8848  # Nacos配置中心地址
-
-# AWS S3 配置
-aws:
-  s3:
-    bucket: magic-bag-files-838811708767
-    region: ap-southeast-1
-    domain: https://magic-bag-files-838811708767.s3.ap-southeast-1.amazonaws.com
-    # AWS凭证配置（可选，如果不配置则使用默认凭证链）
-    aws-access-key-id: ${AWS_ACCESS_KEY_ID:}
-    aws-secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
-
-# 文件上传配置
-file:
-  upload:
-    max-size: 5MB
-    allowed-types: jpg,jpeg,png,gif,webp
-    enable-virus-scan: true
-    enable-content-check: true
