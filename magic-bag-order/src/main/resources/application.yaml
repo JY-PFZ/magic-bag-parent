@@ -16,13 +16,7 @@ spring:
       username: nacos
       password: nacos
       discovery:
-        server-addr: 54.169.196.90:8848  # Nacos??????
+        server-addr: 3.1.213.148:8848 # Nacos??????
         group: MAGIC_BAG
       config:
-        server-addr: 54.169.196.90:8848  # Nacos??????
-
-  s3:
-    region: ap-southeast-1
-    bucket-name: magic-bag-oss
-    aws-access-key-id: ${AWS_ACCESS_KEY_ID:}
-    aws-secret-access-key: ${AWS_SECRET_ACCESS_KEY:}
+        server-addr: 3.1.213.148:8848 # Nacos??????
