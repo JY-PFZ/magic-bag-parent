@@ -65,7 +65,7 @@ public class MerchantServiceImpl implements IMerchantService {
         // 检查是否已经注册过商户
         Merchant existingMerchant = merchantMapper.findByUserId(userId);
         if (existingMerchant != null) {
-            throw new BusinessException(ResultStatus.MERCHANT_HAS_EXISTED, "用户已经注册过商户");
+            throw new BusinessException(ResultStatus.FAIL, "用户已经注册过商户");
         }
         
         Merchant merchant = new Merchant();

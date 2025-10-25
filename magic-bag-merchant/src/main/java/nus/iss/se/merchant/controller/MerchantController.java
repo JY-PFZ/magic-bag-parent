@@ -52,12 +52,12 @@ public class MerchantController {
     public Result<MerchantDto> getMyMerchantProfile() {
         UserContext currentUser = userContextHolder.getCurrentUser();
         if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ResultStatus.ACCESS_DENIED, "User context not found.");
+            throw new BusinessException(ResultStatus.FAIL, "User context not found.");
         }
         
         // 手动检查用户角色
         if (!"MERCHANT".equals(currentUser.getRole())) {
-            throw new BusinessException(ResultStatus.ACCESS_DENIED, "Only merchants can access this resource.");
+            throw new BusinessException(ResultStatus.FAIL, "Only merchants can access this resource.");
         }
         
         Integer userId = currentUser.getId();
@@ -73,7 +73,7 @@ public class MerchantController {
     public Result<Void> registerMerchantProfile(@RequestBody @Valid MerchantUpdateDto merchantDto) {
         UserContext currentUser = userContextHolder.getCurrentUser();
         if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ResultStatus.ACCESS_DENIED, "User context not found.");
+            throw new BusinessException(ResultStatus.FAIL, "User context not found.");
         }
         merchantService.registerMerchant(merchantDto, currentUser.getId());
         return Result.success();
