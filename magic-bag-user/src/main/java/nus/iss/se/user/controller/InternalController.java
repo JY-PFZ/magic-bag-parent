@@ -33,7 +33,7 @@ public class InternalController {
     @GetMapping("/{username}")
     public Result<User> getUserByUsername(@PathVariable String username) {
         User user = userService.findByUsername(username);
-        log.info("Auth service check user:{}-{}; ",username,user);
+        log.info("Auth service check user: {} - {}", username != null ? username.replaceAll("[\\r\\n]", "") : "null", user);
 
         return Result.success(user);
     }
@@ -45,11 +45,11 @@ public class InternalController {
             userCacheService.deleteUserCache(username);
             
             // 2. 记录日志
-            log.info("User cache evicted successfully: {}", username);
+            log.info("User cache evicted successfully: {}", username != null ? username.replaceAll("[\\r\\n]", "") : "null");
             
             return Result.success();
         } catch (Exception e) {
-            log.error("Failed to evict user cache: {}", username, e);
+            log.error("Failed to evict user cache: {}", username != null ? username.replaceAll("[\\r\\n]", "") : "null", e);
             return Result.error("Failed to evict user cache: " + e.getMessage());
         }
     }

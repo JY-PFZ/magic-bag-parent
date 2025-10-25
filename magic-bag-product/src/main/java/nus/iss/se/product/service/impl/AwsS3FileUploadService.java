@@ -113,10 +113,10 @@ public class AwsS3FileUploadService implements FileUploadService {
             // 从数据库删除记录
             fileInfoMapper.deleteById(fileInfo.getId());
             
-            log.info("文件删除成功: {}", fileId);
+            log.info("文件删除成功: {}", fileId != null ? fileId.replaceAll("[\\r\\n]", "") : "null");
             return true;
         } catch (Exception e) {
-            log.error("文件删除失败: {}", fileId, e);
+            log.error("文件删除失败: {}", fileId != null ? fileId.replaceAll("[\\r\\n]", "") : "null", e);
             return false;
         }
     }
@@ -125,9 +125,9 @@ public class AwsS3FileUploadService implements FileUploadService {
         try {
             // 使用S3StorageService进行上传
             s3StorageService.upload(filePath, file.getBytes(), file.getContentType());
-            log.info("文件上传成功: {}", filePath);
+            log.info("文件上传成功: {}", filePath != null ? filePath.replaceAll("[\\r\\n]", "") : "null");
         } catch (Exception e) {
-            log.error("文件上传失败: {}", filePath, e);
+            log.error("文件上传失败: {}", filePath != null ? filePath.replaceAll("[\\r\\n]", "") : "null", e);
             throw new BusinessException(ResultStatus.FAIL, "文件上传失败");
         }
     }
