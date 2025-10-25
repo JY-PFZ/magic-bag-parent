@@ -8,7 +8,6 @@ on:
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   AWS_REGION: ap-southeast-1
-  EC2_DEPLOY_PATH: /home/ubuntu/app
 
 jobs:
   build-and-deploy:
@@ -41,7 +40,9 @@ jobs:
             --region ${{ env.AWS_REGION }} \
             --query authorizationToken --output text)
 
-          echo "📝 Writing ~/.m2/settings.xml..."
+          REPO_URL="https://magic-bag-838811708767.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic_bag/"
+
+          echo "📝 Writing settings.xml to ./.m2/settings.xml..."
           mkdir -p .m2
           cat > .m2/settings.xml << EOF
           <settings>
@@ -54,20 +55,35 @@ jobs:
             </servers>
             <profiles>
               <profile>
-                <id>default</id>
+                <id>codeartifact</id>
                 <repositories>
                   <repository>
                     <id>codeartifact</id>
-                    <url>https://magic-bag-838811708767.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic_bag/</url>
+                    <url>${REPO_URL}</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
                   </repository>
                 </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>codeartifact</id>
+                    <url>${REPO_URL}</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </pluginRepository>
+                </pluginRepositories>
               </profile>
             </profiles>
             <activeProfiles>
-              <activeProfile>default</activeProfile>
+              <activeProfile>codeartifact</activeProfile>
             </activeProfiles>
           </settings>
           EOF
+
+      - name: 🔍 Debug Verify settings.xml
+        run: |
+          ls -la .m2/
+          grep -A2 "<password>" .m2/settings.xml
 
       - name: 🧪 Build All Microservices & Create Docker Images
         run: |
@@ -91,7 +107,7 @@ jobs:
             fi
 
             echo "📦 Building $DIR..."
-            mvn -B -pl "$DIR" test -s ~/.m2/settings.xml
+            mvn -B -pl "$DIR" test -s ./.m2/settings.xml
 
             echo "🐳 Building Docker image for $DIR..."
             docker build -f "$DIR/Dockerfile" \
@@ -133,25 +149,13 @@ jobs:
           key: ${{ secrets.EC2_SSH_KEY }}
           script: |
             cd /home/ubuntu
-
-            # 登录 Docker Hub
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-
-            # 停止并清理旧容器（避免 container_name 冲突）
             echo "🛑 Stopping old services..."
             docker compose down
-
-            # 拉取最新镜像
             echo "📥 Pulling latest images..."
             docker compose pull
-
-            # 启动新服务
             echo "🟢 Starting services..."
             docker compose up -d
-
-            # 清理无用镜像
             docker image prune -f
-
-            # 显示运行状态
             echo "📊 Current status:"
             docker compose ps
