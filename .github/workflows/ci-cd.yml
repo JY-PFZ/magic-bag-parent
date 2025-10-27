@@ -1,4 +1,4 @@
-name: MagicBag CI/CD → Cache + SonarQube + Docker + EC2 + ZAP DAST
+name: MagicBag CI/CD → Smart Build + SonarQube + Docker + EC2 + ZAP DAST
 
 on:
   push:
@@ -9,13 +9,56 @@ env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   AWS_REGION: ap-southeast-1
   MAVEN_OPTS: "-Dmaven.repo.local=/tmp/m2-cache"
-  # ⚠️ 要扫描的目标（通常是 Gateway 入口）
-  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016
+  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016  # Gateway 入口
 
 jobs:
-  build-and-scan:
-    name: 🧪 Build, Cache & SonarQube Scan
+  detect-changes:
+    name: 🔍 Detect Changed Microservices
     runs-on: ubuntu-latest
+    outputs:
+      changed_modules: ${{ steps.set_output.outputs.changed_modules }}
+      has_changes: ${{ steps.set_output.outputs.has_changes }}
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2  # 需要 HEAD~1
+
+      - name: 📂 Identify Changed Modules (with pom.xml)
+        id: set_output
+        run: |
+          CHANGED_MODULES=()
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+
+          # 检查是否有 pom.xml 变更
+          while IFS= read -r file; do
+            if [[ "$file" == *"pom.xml" ]]; then
+              DIR=$(dirname "$file")
+              if [ "$DIR" != "." ]; then
+                CHANGED_MODULES+=("$DIR")
+              fi
+            fi
+          done <<< "$CHANGED_FILES"
+
+          # 去重
+          UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
+          
+          if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
+            echo "No module changes detected."
+            echo "changed_modules=none" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
+            echo "Changed modules: $MODULE_LIST"
+            echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
+  build-and-scan:
+    name: 🧪 Build Changed & SonarQube Scan
+    runs-on: ubuntu-latest
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -23,7 +66,7 @@ jobs:
           fetch-depth: 0
 
       - name: ⏱️ Cache Maven packages
-        uses: actions/cache@v4
+        uses: actions/cache@v3
         with:
           path: /tmp/m2-cache
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
@@ -89,24 +132,16 @@ jobs:
           </settings>
           EOF
 
-      - name: 🧪 Build All Microservices (with test)
+      - name: 🧪 Build Only Changed Microservices
         run: |
-          SERVICES=(
-            "magic-bag-gateway:10016"
-            "magic-bag-auth:10017"
-            "magic-bag-user:10018"
-            "magic-bag-product:10019"
-            "magic-bag-order:10020"
-            "magic-bag-payment:10021"
-            "magic-bag-cart:10022"
-            "magic-bag-merchant:10023"
-            "magic-bag-admin:10024"
-          )
-          for svc in "${SERVICES[@]}"; do
-            IFS=':' read -r DIR PORT <<< "$svc"
-            [ -f "$DIR/pom.xml" ] || continue
-            echo "📦 Building $DIR..."
-            mvn -B -pl "$DIR" clean compile test \
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          for MODULE in "${MODULES[@]}"; do
+            if [ ! -f "$MODULE/pom.xml" ]; then
+              echo "⚠️ Skip $MODULE: no pom.xml"
+              continue
+            fi
+            echo "📦 Building $MODULE..."
+            mvn -B -pl "$MODULE" clean compile test \
               -s /tmp/m2-cache/settings.xml \
               -Dmaven.repo.local=/tmp/m2-cache
           done
@@ -116,31 +151,33 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          CHANGED_DIRS=$(git diff --name-only HEAD~1 HEAD | grep 'pom.xml' | xargs -I {} dirname {} | sort -u)
-          for DIR in $CHANGED_DIRS; do
-            [ -f "$DIR/pom.xml" ] || continue
-            echo "🔍 Scanning $DIR..."
-            mvn -B -pl "$DIR" sonar:sonar \
-              -s /tmp/m2-cache/settings.xml \
-              -Dmaven.repo.local=/tmp/m2-cache \
-              -Dsonar.login="$SONAR_TOKEN" \
-              -Dsonar.host.url="$SONAR_HOST_URL" \
-              -Dsonar.projectKey=magicbag-$DIR \
-              -Dsonar.sources=. \
-              -Dsonar.java.binaries=target
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          for MODULE in "${MODULES[@]}"; do
+            if [ -f "$MODULE/pom.xml" ]; then
+              echo "🔍 Scanning $MODULE with SonarQube..."
+              mvn -B -pl "$MODULE" sonar:sonar \
+                -s /tmp/m2-cache/settings.xml \
+                -Dmaven.repo.local=/tmp/m2-cache \
+                -Dsonar.login="$SONAR_TOKEN" \
+                -Dsonar.host.url="$SONAR_HOST_URL" \
+                -Dsonar.projectKey=magicbag-$MODULE \
+                -Dsonar.sources=. \
+                -Dsonar.java.binaries=target
+            fi
           done
 
-      - name: 📤 Upload Built JARs
+      - name: 📤 Upload Built JARs (Only Changed)
         uses: actions/upload-artifact@v4
         with:
           name: built-jars
           path: |
-            */target/*.jar
+            ${{ needs.detect-changes.outputs.changed_modules }}/target/*.jar
 
   build-and-deploy:
     name: 🐳 Build Docker & Deploy to EC2
     runs-on: ubuntu-latest
-    needs: build-and-scan
+    needs: [detect-changes, build-and-scan]
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -151,56 +188,60 @@ jobs:
           name: built-jars
           path: .
 
-      - name: 🔁 Restore JARs to target directories
+      - name: 🔁 Restore JARs to target Directories
         run: |
-          SERVICES=(
-            magic-bag-gateway magic-bag-auth magic-bag-user
-            magic-bag-product magic-bag-order magic-bag-payment
-            magic-bag-cart magic-bag-merchant magic-bag-admin
-          )
-          for svc in "${SERVICES[@]}"; do
-            mkdir -p "$svc/target"
-            JAR=$(find . -name "${svc}-*.jar" | head -n1)
-            [ -n "$JAR" ] && cp "$JAR" "$svc/target/app.jar" || { echo "❌ Missing JAR for $svc"; exit 1; }
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          for MODULE in "${MODULES[@]}"; do
+            mkdir -p "$MODULE/target"
+            JAR=$(find . -name "${MODULE}-*.jar" | head -n1)
+            if [ -n "$JAR" ]; then
+              cp "$JAR" "$MODULE/target/app.jar"
+              echo "✅ Copied $JAR to $MODULE/target/app.jar"
+            else
+              echo "❌ JAR not found for $MODULE"
+              exit 1
+            fi
           done
 
-      - name: 🐳 Build Docker Images
+      - name: 🐳 Build Docker Images (Only Changed)
         run: |
-          SERVICES=(
-            "magic-bag-gateway:10016"
-            "magic-bag-auth:10017"
-            "magic-bag-user:10018"
-            "magic-bag-product:10019"
-            "magic-bag-order:10020"
-            "magic-bag-payment:10021"
-            "magic-bag-cart:10022"
-            "magic-bag-merchant:10023"
-            "magic-bag-admin:10024"
-          )
-          for svc in "${SERVICES[@]}"; do
-            IFS=':' read -r DIR PORT <<< "$svc"
-            docker build -f "$DIR/Dockerfile" \
-              --build-arg SERVICE_NAME="$DIR" \
-              --build-arg APP_PORT="$PORT" \
-              --build-arg TZ=Asia/Singapore \
-              -t ${{ secrets.DOCKERHUB_USERNAME }}/"$DIR":latest .
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          for MODULE in "${MODULES[@]}"; do
+            if [ -f "$MODULE/Dockerfile" ]; then
+              # 从模块名推断端口（如 magic-bag-user → 10018）
+              BASE_NAME=$(echo "$MODULE" | cut -d'-' -f3-)
+              case "$BASE_NAME" in
+                "gateway") PORT=10016 ;;
+                "auth") PORT=10017 ;;
+                "user") PORT=10018 ;;
+                "product") PORT=10019 ;;
+                "order") PORT=10020 ;;
+                "payment") PORT=10021 ;;
+                "cart") PORT=10022 ;;
+                "merchant") PORT=10023 ;;
+                "admin") PORT=10024 ;;
+                *) PORT=8080 ;;
+              esac
+              echo "🐳 Building $MODULE on port $PORT..."
+              docker build -f "$MODULE/Dockerfile" \
+                --build-arg SERVICE_NAME="$MODULE" \
+                --build-arg APP_PORT="$PORT" \
+                --build-arg TZ=Asia/Singapore \
+                -t ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest .
+            fi
           done
 
       - name: 🔐 Login to Docker Hub
-        uses: docker/login-action@v4
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 🚀 Push Images to Docker Hub
+      - name: 🚀 Push Changed Images to Docker Hub
         run: |
-          SERVICES=(
-            magic-bag-gateway magic-bag-auth magic-bag-user
-            magic-bag-product magic-bag-order magic-bag-payment
-            magic-bag-cart magic-bag-merchant magic-bag-admin
-          )
-          for svc in "${SERVICES[@]}"; do
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$svc":latest
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          for MODULE in "${MODULES[@]}"; do
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest
           done
 
       - name: 🌐 Deploy to EC2 via SSH
@@ -221,9 +262,9 @@ jobs:
     name: 🛡️ ZAP DAST Security Scan
     runs-on: ubuntu-latest
     needs: build-and-deploy
-    # 可选：即使部署失败也扫描（调试用），正式环境建议去掉 if: always()
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
-      - name: ⏳ Wait for service to be ready
+      - name: ⏳ Wait for Service to Be Ready
         run: |
           echo "⏳ Waiting 30s for services to start..."
           sleep 30
@@ -238,8 +279,7 @@ jobs:
             owasp/zap2docker-stable \
             zap-baseline.py \
             -t ${{ env.TARGET_URL }} \
-            -r zap-report.html \
-            -d  # 调试模式（可选）
+            -r zap-report.html
 
       - name: 📤 Upload ZAP Report
         uses: actions/upload-artifact@v4
@@ -249,7 +289,6 @@ jobs:
 
       - name: ❌ Fail on High/Critical Alerts (Optional)
         run: |
-          # 检查报告中是否有 High/Critical 风险
           if grep -q "High.*>" zap-report/zap-report.html || grep -q "Critical.*>" zap-report/zap-report.html; then
             echo "💥 ZAP found High/Critical vulnerabilities!"
             exit 1
