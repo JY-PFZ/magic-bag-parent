@@ -1,4 +1,4 @@
-name: MagicBag CI/CD → Docker Hub + EC2
+name: MagicBag CI/CD → Cache + SonarQube + Docker + EC2 + ZAP DAST
 
 on:
   push:
@@ -8,21 +8,27 @@ on:
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   AWS_REGION: ap-southeast-1
+  MAVEN_OPTS: "-Dmaven.repo.local=/tmp/m2-cache"
+  # ⚠️ 要扫描的目标（通常是 Gateway 入口）
+  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016
 
 jobs:
-  build-and-deploy:
-    name: 🐳 Build, Push & Deploy Microservices
+  build-and-scan:
+    name: 🧪 Build, Cache & SonarQube Scan
     runs-on: ubuntu-latest
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
-
-      - name: ⚙️ Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          fetch-depth: 0
+
+      - name: ⏱️ Cache Maven packages
+        uses: actions/cache@v3
+        with:
+          path: /tmp/m2-cache
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
       - name: ⚙️ Setup JDK 21
         uses: actions/setup-java@v4
@@ -31,20 +37,23 @@ jobs:
           distribution: 'temurin'
           cache: 'maven'
 
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
       - name: 🔑 Generate CodeArtifact settings.xml
         run: |
-          echo "🔧 Fetching CodeArtifact token..."
           TOKEN=$(aws codeartifact get-authorization-token \
             --domain magic-bag \
             --domain-owner 838811708767 \
             --region ${{ env.AWS_REGION }} \
             --query authorizationToken --output text)
-
           REPO_URL="https://magic-bag-838811708767.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic_bag/"
-
-          echo "📝 Writing settings.xml to ./.m2/settings.xml..."
-          mkdir -p .m2
-          cat > .m2/settings.xml << EOF
+          mkdir -p /tmp/m2-cache
+          cat > /tmp/m2-cache/settings.xml << EOF
           <settings>
             <servers>
               <server>
@@ -80,12 +89,7 @@ jobs:
           </settings>
           EOF
 
-      - name: 🔍 Debug Verify settings.xml
-        run: |
-          ls -la .m2/
-          grep -A2 "<password>" .m2/settings.xml
-
-      - name: 🧪 Build All Microservices & Create Docker Images
+      - name: 🧪 Build All Microservices (with test)
         run: |
           SERVICES=(
             "magic-bag-gateway:10016"
@@ -98,18 +102,83 @@ jobs:
             "magic-bag-merchant:10023"
             "magic-bag-admin:10024"
           )
-
           for svc in "${SERVICES[@]}"; do
             IFS=':' read -r DIR PORT <<< "$svc"
-            if [ ! -f "$DIR/pom.xml" ]; then
-              echo "⚠️ Skip $DIR: pom.xml not found"
-              continue
-            fi
-
+            [ -f "$DIR/pom.xml" ] || continue
             echo "📦 Building $DIR..."
-            mvn -B -pl "$DIR" test -s ./.m2/settings.xml
+            mvn -B -pl "$DIR" clean compile test \
+              -s /tmp/m2-cache/settings.xml \
+              -Dmaven.repo.local=/tmp/m2-cache
+          done
 
-            echo "🐳 Building Docker image for $DIR..."
+      - name: 📊 SonarQube Scan (Changed Modules Only)
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          CHANGED_DIRS=$(git diff --name-only HEAD~1 HEAD | grep 'pom.xml' | xargs -I {} dirname {} | sort -u)
+          for DIR in $CHANGED_DIRS; do
+            [ -f "$DIR/pom.xml" ] || continue
+            echo "🔍 Scanning $DIR..."
+            mvn -B -pl "$DIR" sonar:sonar \
+              -s /tmp/m2-cache/settings.xml \
+              -Dmaven.repo.local=/tmp/m2-cache \
+              -Dsonar.login="$SONAR_TOKEN" \
+              -Dsonar.host.url="$SONAR_HOST_URL" \
+              -Dsonar.projectKey=magicbag-$DIR \
+              -Dsonar.sources=. \
+              -Dsonar.java.binaries=target
+          done
+
+      - name: 📤 Upload Built JARs
+        uses: actions/upload-artifact@v3
+        with:
+          name: built-jars
+          path: |
+            */target/*.jar
+
+  build-and-deploy:
+    name: 🐳 Build Docker & Deploy to EC2
+    runs-on: ubuntu-latest
+    needs: build-and-scan
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: 📥 Download Built JARs
+        uses: actions/download-artifact@v3
+        with:
+          name: built-jars
+          path: .
+
+      - name: 🔁 Restore JARs to target directories
+        run: |
+          SERVICES=(
+            magic-bag-gateway magic-bag-auth magic-bag-user
+            magic-bag-product magic-bag-order magic-bag-payment
+            magic-bag-cart magic-bag-merchant magic-bag-admin
+          )
+          for svc in "${SERVICES[@]}"; do
+            mkdir -p "$svc/target"
+            JAR=$(find . -name "${svc}-*.jar" | head -n1)
+            [ -n "$JAR" ] && cp "$JAR" "$svc/target/app.jar" || { echo "❌ Missing JAR for $svc"; exit 1; }
+          done
+
+      - name: 🐳 Build Docker Images
+        run: |
+          SERVICES=(
+            "magic-bag-gateway:10016"
+            "magic-bag-auth:10017"
+            "magic-bag-user:10018"
+            "magic-bag-product:10019"
+            "magic-bag-order:10020"
+            "magic-bag-payment:10021"
+            "magic-bag-cart:10022"
+            "magic-bag-merchant:10023"
+            "magic-bag-admin:10024"
+          )
+          for svc in "${SERVICES[@]}"; do
+            IFS=':' read -r DIR PORT <<< "$svc"
             docker build -f "$DIR/Dockerfile" \
               --build-arg SERVICE_NAME="$DIR" \
               --build-arg APP_PORT="$PORT" \
@@ -123,21 +192,14 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 🚀 Push All Images to Docker Hub
+      - name: 🚀 Push Images to Docker Hub
         run: |
           SERVICES=(
-            magic-bag-gateway
-            magic-bag-auth
-            magic-bag-user
-            magic-bag-product
-            magic-bag-order
-            magic-bag-payment
-            magic-bag-cart
-            magic-bag-merchant
-            magic-bag-admin
+            magic-bag-gateway magic-bag-auth magic-bag-user
+            magic-bag-product magic-bag-order magic-bag-payment
+            magic-bag-cart magic-bag-merchant magic-bag-admin
           )
           for svc in "${SERVICES[@]}"; do
-            echo "📤 Pushing $svc..."
             docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$svc":latest
           done
 
@@ -150,12 +212,47 @@ jobs:
           script: |
             cd /home/ubuntu
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
-            echo "🛑 Stopping old services..."
             docker compose down
-            echo "📥 Pulling latest images..."
             docker compose pull
-            echo "🟢 Starting services..."
             docker compose up -d
             docker image prune -f
-            echo "📊 Current status:"
-            docker compose ps
+
+  dast-scan:
+    name: 🛡️ ZAP DAST Security Scan
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    # 可选：即使部署失败也扫描（调试用），正式环境建议去掉 if: always()
+    steps:
+      - name: ⏳ Wait for service to be ready
+        run: |
+          echo "⏳ Waiting 30s for services to start..."
+          sleep 30
+          echo "📡 Testing connectivity to ${{ env.TARGET_URL }}"
+          curl -f --retry 5 --retry-delay 5 --max-time 10 ${{ env.TARGET_URL }}/actuator/health || exit 1
+
+      - name: 🕵️ Run ZAP Baseline Scan
+        run: |
+          mkdir -p zap-report
+          docker run -v $PWD/zap-report:/zap/wrk:rw \
+            --rm \
+            owasp/zap2docker-stable \
+            zap-baseline.py \
+            -t ${{ env.TARGET_URL }} \
+            -r zap-report.html \
+            -d  # 调试模式（可选）
+
+      - name: 📤 Upload ZAP Report
+        uses: actions/upload-artifact@v3
+        with:
+          name: zap-dast-report
+          path: zap-report/zap-report.html
+
+      - name: ❌ Fail on High/Critical Alerts (Optional)
+        run: |
+          # 检查报告中是否有 High/Critical 风险
+          if grep -q "High.*>" zap-report/zap-report.html || grep -q "Critical.*>" zap-report/zap-report.html; then
+            echo "💥 ZAP found High/Critical vulnerabilities!"
+            exit 1
+          else
+            echo "✅ No High/Critical issues found."
+          fi
