@@ -5,74 +5,90 @@ on:
     branches: [ main ]
   workflow_dispatch:
     inputs:
-      deploy_type:
-        description: '选择部署类型'
+      build_strategy:
+        description: '构建策略'
         required: true
+        default: 'incremental'
         type: choice
         options:
-          - all
-          - changed
-        default: all
+          - incremental  # 仅构建修改的服务
+          - full         # 构建所有服务
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   AWS_REGION: ap-southeast-1
   MAVEN_OPTS: "-Dmaven.repo.local=/tmp/m2-cache"
-  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016 # Gateway 入口
+  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016
 
 jobs:
-  determine-deploy-modules:
-    name: 🧭 Determine Deployment Modules
+  detect-changes:
+    name: 🔍 Detect Changed Microservices
     runs-on: ubuntu-latest
     outputs:
       changed_modules: ${{ steps.set_output.outputs.changed_modules }}
       has_changes: ${{ steps.set_output.outputs.has_changes }}
+      all_modules: ${{ steps.set_output.outputs.all_modules }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2
-      - name: 📋 Set Deployment Type
+          fetch-depth: 2  # 需要 HEAD~1
+
+      - name: 📂 Identify Modules
         id: set_output
-        env:
-          DEPLOY_TYPE: ${{ github.event.inputs.deploy_type || 'all' }}
         run: |
-          echo "DEPLOY_TYPE: $DEPLOY_TYPE"  # 调试输出
-          if [ "$DEPLOY_TYPE" == "all" ]; then
-            ALL_MODULES="gateway,auth,user,product,order,payment,cart,merchant,admin"
-            echo "changed_modules=$ALL_MODULES" >> $GITHUB_OUTPUT
-            echo "has_changes=true" >> $GITHUB_OUTPUT
-          elif [ "$DEPLOY_TYPE" == "changed" ]; then
-            CHANGED_MODULES=()
-            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-            while IFS= read -r file; do
-              if [[ "$file" == *"pom.xml" ]]; then
-                DIR=$(dirname "$file")
-                if [ "$DIR" != "." ]; then
-                  CHANGED_MODULES+=("$DIR")
-                fi
-              fi
-            done <<< "$CHANGED_FILES"
-            UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
-            if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
-              echo "No module changes detected."
-              echo "changed_modules=none" >> $GITHUB_OUTPUT
-              echo "has_changes=false" >> $GITHUB_OUTPUT
-            else
-              MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
-              echo "Changed modules: $MODULE_LIST"
-              echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
-              echo "has_changes=true" >> $GITHUB_OUTPUT
+          # 首先获取所有包含 pom.xml 的子模块（全量列表）
+          ALL_MODULES=()
+          while IFS= read -r file; do
+            DIR=$(dirname "$file")
+            if [ "$DIR" != "." ]; then
+              ALL_MODULES+=("$DIR")
             fi
-          else
-            echo "Invalid deploy_type: $DEPLOY_TYPE"
-            exit 1
+          done <<< "$(find . -name 'pom.xml' | grep -v '^./pom.xml$')"
+
+          UNIQUE_ALL_MODULES=($(printf "%s\n" "${ALL_MODULES[@]}" | sort -u))
+          ALL_MODULE_LIST=$(IFS=','; echo "${UNIQUE_ALL_MODULES[*]}")
+          echo "all_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
+
+          # 根据构建策略决定使用全量还是增量
+          if [ "${{ github.event.inputs.build_strategy || 'incremental' }}" = "full" ]; then
+            echo "使用全量构建策略"
+            echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
           fi
+
+          # 增量构建逻辑（原有逻辑）
+          CHANGED_MODULES=()
+          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+
+          while IFS= read -r file; do
+            if [[ "$file" == *"pom.xml" ]]; then
+              DIR=$(dirname "$file")
+              if [ "$DIR" != "." ]; then
+                CHANGED_MODULES+=("$DIR")
+              fi
+            fi
+          done <<< "$CHANGED_FILES"
+
+          UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
+
+          if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
+            echo "No module changes detected."
+            echo "changed_modules=none" >> $GITHUB_OUTPUT
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
+            echo "Changed modules: $MODULE_LIST"
+            echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+          fi
+
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
-    needs: determine-deploy-modules
-    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
+    needs: detect-changes
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -84,7 +100,8 @@ jobs:
         with:
           path: /tmp/m2-cache
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: ${{ runner.os }}-m2-
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
       - name: ⚙️ Setup JDK 21
         uses: actions/setup-java@v4
@@ -107,7 +124,7 @@ jobs:
             --domain-owner 935194211492 \
             --region ${{ env.AWS_REGION }} \
             --query authorizationToken --output text)
-          REPO_URL="https://se-935194211492.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic-bag/"
+          REPO_URL="https://magic-bag-935194211492.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic_bag/"
           mkdir -p /tmp/m2-cache
           cat > /tmp/m2-cache/settings.xml << EOF
           <settings>
@@ -147,7 +164,7 @@ jobs:
 
       - name: 🧪 Build Only Changed Microservices
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ ! -f "$MODULE/pom.xml" ]; then
               echo "⚠️ Skip $MODULE: no pom.xml"
@@ -164,7 +181,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/pom.xml" ]; then
               echo "🔍 Scanning $MODULE with SonarQube..."
@@ -184,13 +201,13 @@ jobs:
         with:
           name: built-jars
           path: |
-            ${{ needs.determine-deploy-modules.outputs.changed_modules }}/target/*.jar
+            ${{ needs.detect-changes.outputs.changed_modules }}/target/*.jar
 
   build-and-deploy:
     name: 🐳 Build Docker & Deploy to EC2
     runs-on: ubuntu-latest
-    needs: [determine-deploy-modules, build-and-scan]
-    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
+    needs: [detect-changes, build-and-scan]
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -203,7 +220,7 @@ jobs:
 
       - name: 🔁 Restore JARs to target Directories
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             mkdir -p "$MODULE/target"
             JAR=$(find . -name "${MODULE}-*.jar" | head -n1)
@@ -218,7 +235,7 @@ jobs:
 
       - name: 🐳 Build Docker Images (Only Changed)
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/Dockerfile" ]; then
               BASE_NAME=$(echo "$MODULE" | cut -d'-' -f3-)
@@ -251,7 +268,7 @@ jobs:
 
       - name: 🚀 Push Changed Images to Docker Hub
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest
           done
@@ -274,7 +291,7 @@ jobs:
     name: 🛡️ ZAP DAST Security Scan
     runs-on: ubuntu-latest
     needs: build-and-deploy
-    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
     steps:
       - name: ⏳ Wait for Service to Be Ready
         run: |
@@ -299,7 +316,7 @@ jobs:
           name: zap-dast-report
           path: zap-report/zap-report.html
 
-      - name: ❌ Fail on High/Critical Alerts
+      - name: ❌ Fail on High/Critical Alerts (Optional)
         run: |
           if grep -q "High.*>" zap-report/zap-report.html || grep -q "Critical.*>" zap-report/zap-report.html; then
             echo "💥 ZAP found High/Critical vulnerabilities!"
