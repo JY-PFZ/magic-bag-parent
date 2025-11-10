@@ -8,7 +8,7 @@ on:
       build_strategy:
         description: '构建策略'
         required: true
-        default: 'incremental'
+        default: 'full'
         type: choice
         options:
           - incremental  # 仅构建修改的服务
