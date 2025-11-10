@@ -28,6 +28,16 @@ public class RsaUtil {
     private final PrivateKey privateKey;
     private final PublicKey publicKey;
 
+    public RsaUtil(String privateKeyPath, String publicKeyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
+        this.privateKey = loadPrivateKey(privateKeyPath);
+        this.publicKey = loadPublicKey(publicKeyPath);
+    }
+
+    public RsaUtil(PrivateKey privateKey, PublicKey publicKey) {
+        this.privateKey = privateKey;
+        this.publicKey = publicKey;
+    }
+
     /**
      * 将 PublicKey 转为 Base64 编码字符串（X.509 格式）
      */
@@ -56,10 +66,6 @@ public class RsaUtil {
         return sb.toString();
     }
 
-    public RsaUtil(String privateKeyPath, String publicKeyPath) throws IOException, NoSuchAlgorithmException, InvalidKeySpecException {
-        this.privateKey = loadPrivateKey(privateKeyPath);
-        this.publicKey = loadPublicKey(publicKeyPath);
-    }
 
     public String encrypt(String plaintext) throws NoSuchPaddingException, NoSuchAlgorithmException, IllegalBlockSizeException, BadPaddingException, InvalidKeyException {
         Cipher cipher = Cipher.getInstance("RSA/ECB/OAEPWithSHA-256AndMGF1Padding");

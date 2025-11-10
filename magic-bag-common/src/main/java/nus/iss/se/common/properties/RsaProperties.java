@@ -15,4 +15,8 @@ public class RsaProperties {
     private String publicKeyPath;
 
     private String privateKeyPath;
+
+    private String publicKey;
+
+    private String privateKey;
 }

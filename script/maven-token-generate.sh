@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # 设置变量
-DOMAIN="magic-bag"
-REPOSITORY="magic_bag"
+DOMAIN="se"
+REPOSITORY="magic-bag"
 REGION="ap-southeast-1"
-DOMAIN_OWNER="838811708767"
+DOMAIN_OWNER="935194211492"
 
 # 获取授权令牌
 export CODEARTIFACT_AUTH_TOKEN=`aws codeartifact get-authorization-token \
