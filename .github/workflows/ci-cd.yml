@@ -31,30 +31,26 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # 需要 HEAD~1
+          fetch-depth: 2  # 需要比较上一次提交
 
       - name: 📂 Identify Modules (Full/Incremental)
         id: set_output
         run: |
-          # 1. 首先获取所有包含 pom.xml 的子模块（全量列表）
+          # 1. 获取全量模块列表（所有包含 pom.xml 的子目录）
           ALL_MODULES=()
-          # 查找所有子目录中的 pom.xml（排除根目录）
           while IFS= read -r file; do
             DIR=$(dirname "$file")
-            # 确保是子模块目录（非根目录）且不在 target 目录下
             if [ "$DIR" != "." ] && [[ "$DIR" != *"/target/"* ]]; then
               ALL_MODULES+=("$DIR")
             fi
           done <<< "$(find . -name 'pom.xml' -not -path './pom.xml')"
           
-          # 去重并排序
           UNIQUE_ALL_MODULES=($(printf "%s\n" "${ALL_MODULES[@]}" | sort -u))
           ALL_MODULE_LIST=$(IFS=','; echo "${UNIQUE_ALL_MODULES[*]}")
           echo "全量模块列表: $ALL_MODULE_LIST"
           
-          # 2. 根据构建策略决定使用全量还是增量
+          # 2. 检查构建策略，全量构建直接返回所有模块
           BUILD_STRATEGY="${{ github.event.inputs.build_strategy || 'incremental' }}"
-          
           if [ "$BUILD_STRATEGY" = "full" ]; then
             echo "使用全量构建策略"
             echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
@@ -62,11 +58,20 @@ jobs:
             exit 0
           fi
           
-          # 3. 增量构建逻辑（原有逻辑）
+          # 3. 增量构建逻辑优化
           CHANGED_MODULES=()
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
           echo "变更文件列表: $CHANGED_FILES"
           
+          # 检测是否有 workflow 配置变更（需要触发全量构建）
+          if echo "$CHANGED_FILES" | grep -q ".github/workflows/"; then
+            echo "检测到 workflow 配置变更，触发全量构建"
+            echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          
+          # 检测 pom.xml 变更
           while IFS= read -r file; do
             if [[ "$file" == *"pom.xml" ]]; then
               DIR=$(dirname "$file")
@@ -76,7 +81,7 @@ jobs:
             fi
           done <<< "$CHANGED_FILES"
           
-          # 去重
+          # 去重处理
           UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
           
           if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
