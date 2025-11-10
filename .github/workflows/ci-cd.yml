@@ -36,9 +36,14 @@ jobs:
       - name: 📋 Set Deployment Type
         id: set_output
         run: |
+          # 修复：正确获取workflow_dispatch输入
           DEPLOY_TYPE="${{ github.event.inputs.deploy_type }}"
+          
+          # 添加调试输出（实际部署时可以移除）
+          echo "DEPLOY_TYPE: $DEPLOY_TYPE"
+          
           if [ "$DEPLOY_TYPE" == "all" ]; then
-            # 所有服务的硬编码列表（根据项目结构）
+            # 所有服务的硬编码列表
             ALL_MODULES="gateway,auth,user,product,order,payment,cart,merchant,admin"
             echo "changed_modules=$ALL_MODULES" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
