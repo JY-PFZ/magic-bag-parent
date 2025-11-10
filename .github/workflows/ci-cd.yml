@@ -186,22 +186,16 @@ jobs:
               -Dmaven.repo.local=/tmp/m2-cache
           done
 
-      - name: 📊 SonarQube Scan (Changed Modules Only)
+      - name: 📊 SonarQube Scan
+        if: steps.detect-changes.outputs.changed_modules != ''
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
-          for MODULE in "${MODULES[@]}"; do
-            if [ -f "$MODULE/pom.xml" ]; then
-              echo "🔍 Scanning module: $MODULE"
-          
-              mvn -B -pl "$MODULE" -am sonar:sonar \
-                -s /tmp/m2-cache/settings.xml \
-                -Dmaven.repo.local=/tmp/m2-cache \
-                -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
-                -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-                -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-                -Dsonar.projectKey="magic-bag-parent"
-            fi
-          done
+          echo "🔍 At least one module changed. Scanning full multi-module project..."
+          mvn -B clean verify sonar:sonar \
+            -s /tmp/m2-cache/settings.xml \
+            -Dmaven.repo.local=/tmp/m2-cache \
+            -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+            -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
 
       - name: 📤 Upload Built JARs (Only Changed)
         uses: actions/upload-artifact@v4
