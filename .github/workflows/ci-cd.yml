@@ -134,7 +134,7 @@ jobs:
             --domain-owner 935194211492 \
             --region ${{ env.AWS_REGION }} \
             --query authorizationToken --output text)
-          REPO_URL="https://magic-bag-935194211492.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic_bag/"
+          REPO_URL="https://magic-bag-935194211492.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic-bag/"
           mkdir -p /tmp/m2-cache
           cat > /tmp/m2-cache/settings.xml << EOF
           <settings>
