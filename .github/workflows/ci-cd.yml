@@ -4,16 +4,25 @@ on:
   push:
     branches: [ main ]
   workflow_dispatch:
+    inputs:
+      deploy_type:
+        description: '选择部署类型'
+        required: true
+        type: choice
+        options:
+          - all
+          - changed
+        default: all
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
   AWS_REGION: ap-southeast-1
   MAVEN_OPTS: "-Dmaven.repo.local=/tmp/m2-cache"
-  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016  # Gateway 入口
+  TARGET_URL: http://${{ secrets.EC2_HOST }}:10016 # Gateway 入口
 
 jobs:
-  detect-changes:
-    name: 🔍 Detect Changed Microservices
+  determine-deploy-modules:
+    name: 🧭 Determine Deployment Modules
     runs-on: ubuntu-latest
     outputs:
       changed_modules: ${{ steps.set_output.outputs.changed_modules }}
@@ -22,43 +31,49 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # 需要 HEAD~1
+          fetch-depth: 2
 
-      - name: 📂 Identify Changed Modules (with pom.xml)
+      - name: 📋 Set Deployment Type
         id: set_output
         run: |
-          CHANGED_MODULES=()
-          CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-
-          # 检查是否有 pom.xml 变更
-          while IFS= read -r file; do
-            if [[ "$file" == *"pom.xml" ]]; then
-              DIR=$(dirname "$file")
-              if [ "$DIR" != "." ]; then
-                CHANGED_MODULES+=("$DIR")
-              fi
-            fi
-          done <<< "$CHANGED_FILES"
-
-          # 去重
-          UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
-          
-          if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
-            echo "No module changes detected."
-            echo "changed_modules=none" >> $GITHUB_OUTPUT
-            echo "has_changes=false" >> $GITHUB_OUTPUT
-          else
-            MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
-            echo "Changed modules: $MODULE_LIST"
-            echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
+          DEPLOY_TYPE="${{ github.event.inputs.deploy_type }}"
+          if [ "$DEPLOY_TYPE" == "all" ]; then
+            # 所有服务的硬编码列表（根据项目结构）
+            ALL_MODULES="gateway,auth,user,product,order,payment,cart,merchant,admin"
+            echo "changed_modules=$ALL_MODULES" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
+          elif [ "$DEPLOY_TYPE" == "changed" ]; then
+            CHANGED_MODULES=()
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
+            while IFS= read -r file; do
+              if [[ "$file" == *"pom.xml" ]]; then
+                DIR=$(dirname "$file")
+                if [ "$DIR" != "." ]; then
+                  CHANGED_MODULES+=("$DIR")
+                fi
+              fi
+            done <<< "$CHANGED_FILES"
+            UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
+            if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
+              echo "No module changes detected."
+              echo "changed_modules=none" >> $GITHUB_OUTPUT
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+            else
+              MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
+              echo "Changed modules: $MODULE_LIST"
+              echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "Invalid deploy_type: $DEPLOY_TYPE"
+            exit 1
           fi
 
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
-    needs: detect-changes
-    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    needs: determine-deploy-modules
+    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -70,8 +85,7 @@ jobs:
         with:
           path: /tmp/m2-cache
           key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
-          restore-keys: |
-            ${{ runner.os }}-m2-
+          restore-keys: ${{ runner.os }}-m2-
 
       - name: ⚙️ Setup JDK 21
         uses: actions/setup-java@v4
@@ -134,7 +148,7 @@ jobs:
 
       - name: 🧪 Build Only Changed Microservices
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ ! -f "$MODULE/pom.xml" ]; then
               echo "⚠️ Skip $MODULE: no pom.xml"
@@ -151,7 +165,7 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/pom.xml" ]; then
               echo "🔍 Scanning $MODULE with SonarQube..."
@@ -171,13 +185,13 @@ jobs:
         with:
           name: built-jars
           path: |
-            ${{ needs.detect-changes.outputs.changed_modules }}/target/*.jar
+            ${{ needs.determine-deploy-modules.outputs.changed_modules }}/target/*.jar
 
   build-and-deploy:
     name: 🐳 Build Docker & Deploy to EC2
     runs-on: ubuntu-latest
-    needs: [detect-changes, build-and-scan]
-    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    needs: [determine-deploy-modules, build-and-scan]
+    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
@@ -190,7 +204,7 @@ jobs:
 
       - name: 🔁 Restore JARs to target Directories
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             mkdir -p "$MODULE/target"
             JAR=$(find . -name "${MODULE}-*.jar" | head -n1)
@@ -205,10 +219,9 @@ jobs:
 
       - name: 🐳 Build Docker Images (Only Changed)
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/Dockerfile" ]; then
-              # 从模块名推断端口（如 magic-bag-user → 10018）
               BASE_NAME=$(echo "$MODULE" | cut -d'-' -f3-)
               case "$BASE_NAME" in
                 "gateway") PORT=10016 ;;
@@ -239,7 +252,7 @@ jobs:
 
       - name: 🚀 Push Changed Images to Docker Hub
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          IFS=',' read -ra MODULES <<< "${{ needs.determine-deploy-modules.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest
           done
@@ -255,14 +268,14 @@ jobs:
             echo "${{ secrets.DOCKERHUB_TOKEN }}" | docker login -u ${{ secrets.DOCKERHUB_USERNAME }} --password-stdin
             docker compose down
             docker compose pull
-            docker compose up -d
+            docker compose --env-file .env up -d
             docker image prune -f
 
   dast-scan:
     name: 🛡️ ZAP DAST Security Scan
     runs-on: ubuntu-latest
     needs: build-and-deploy
-    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    if: ${{ needs.determine-deploy-modules.outputs.has_changes == 'true' }}
     steps:
       - name: ⏳ Wait for Service to Be Ready
         run: |
@@ -287,7 +300,7 @@ jobs:
           name: zap-dast-report
           path: zap-report/zap-report.html
 
-      - name: ❌ Fail on High/Critical Alerts (Optional)
+      - name: ❌ Fail on High/Critical Alerts
         run: |
           if grep -q "High.*>" zap-report/zap-report.html || grep -q "Critical.*>" zap-report/zap-report.html; then
             echo "💥 ZAP found High/Critical vulnerabilities!"
