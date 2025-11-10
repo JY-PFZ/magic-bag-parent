@@ -195,14 +195,14 @@ jobs:
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/pom.xml" ]; then
               echo "🔍 Scanning $MODULE with SonarQube..."
-              mvn -B -pl "$MODULE" sonar:sonar \
-                -s /tmp/m2-cache/settings.xml \
-                -Dmaven.repo.local=/tmp/m2-cache \
-                -Dsonar.login="$SONAR_TOKEN" \
-                -Dsonar.host.url="$SONAR_HOST_URL" \
-                -Dsonar.projectKey=magicbag-$MODULE \
-                -Dsonar.sources=. \
-                -Dsonar.java.binaries=target
+              mvn -B -pl "$MODULE" -am sonar:sonar \
+              -s /tmp/m2-cache/settings.xml \
+              -Dmaven.repo.local=/tmp/m2-cache \
+              -Dsonar.login="$SONAR_TOKEN" \
+              -Dsonar.host.url="$SONAR_HOST_URL" \
+              -Dsonar.projectKey=magicbag-$MODULE \
+              -Dsonar.sources=./$MODULE \
+              -Dsonar.java.binaries=./$MODULE/target
             fi
           done
 
