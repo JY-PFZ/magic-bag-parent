@@ -191,12 +191,7 @@ jobs:
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/pom.xml" ]; then
-              # ✅ 正确清理：移除 ./ 并将 / 替换为 -
-              SAFE_MODULE=$(echo "$MODULE" | sed 's|^\./||' | sed 's|/|-|g')
-              PROJECT_KEY="magicbag-$SAFE_MODULE"
-              JACOCO_REPORT="$MODULE/target/site/jacoco/jacoco.xml"
-        
-              echo "🔍 Scanning module: $MODULE → Project Key: $PROJECT_KEY"
+              echo "🔍 Scanning module: $MODULE"
           
               mvn -B -pl "$MODULE" -am sonar:sonar \
                 -s /tmp/m2-cache/settings.xml \
@@ -204,8 +199,7 @@ jobs:
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
                 -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
                 -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-                -Dsonar.projectKey="$PROJECT_KEY" \
-                -Dsonar.coverage.jacoco.xmlReportPaths="$JACOCO_REPORT"
+                -Dsonar.projectKey=magic-bag-parent
             fi
           done
 
