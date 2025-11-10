@@ -199,7 +199,7 @@ jobs:
                 -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
                 -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
                 -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
-                -Dsonar.projectKey=magic-bag-parent
+                -Dsonar.projectKey="magic-bag-parent"
             fi
           done
 

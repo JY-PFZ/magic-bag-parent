@@ -61,6 +61,7 @@
         <sonar.projectKey>magic-bag-parent</sonar.projectKey>
         <sonar.organization>jy-pfz</sonar.organization>
         <sonar.host.url>https://sonarcloud.io</sonar.host.url>
+        <sonar.branch.name>main</sonar.branch.name>
     </properties>
 
     <dependencies>
