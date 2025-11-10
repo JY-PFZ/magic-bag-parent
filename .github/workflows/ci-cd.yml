@@ -27,52 +27,58 @@ jobs:
     outputs:
       changed_modules: ${{ steps.set_output.outputs.changed_modules }}
       has_changes: ${{ steps.set_output.outputs.has_changes }}
-      all_modules: ${{ steps.set_output.outputs.all_modules }}
     steps:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
           fetch-depth: 2  # 需要 HEAD~1
 
-      - name: 📂 Identify Modules
+      - name: 📂 Identify Modules (Full/Incremental)
         id: set_output
         run: |
-          # 首先获取所有包含 pom.xml 的子模块（全量列表）
+          # 1. 首先获取所有包含 pom.xml 的子模块（全量列表）
           ALL_MODULES=()
+          # 查找所有子目录中的 pom.xml（排除根目录）
           while IFS= read -r file; do
             DIR=$(dirname "$file")
-            if [ "$DIR" != "." ]; then
+            # 确保是子模块目录（非根目录）且不在 target 目录下
+            if [ "$DIR" != "." ] && [[ "$DIR" != *"/target/"* ]]; then
               ALL_MODULES+=("$DIR")
             fi
-          done <<< "$(find . -name 'pom.xml' | grep -v '^./pom.xml$')"
-
+          done <<< "$(find . -name 'pom.xml' -not -path './pom.xml')"
+          
+          # 去重并排序
           UNIQUE_ALL_MODULES=($(printf "%s\n" "${ALL_MODULES[@]}" | sort -u))
           ALL_MODULE_LIST=$(IFS=','; echo "${UNIQUE_ALL_MODULES[*]}")
-          echo "all_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
-
-          # 根据构建策略决定使用全量还是增量
-          if [ "${{ github.event.inputs.build_strategy || 'incremental' }}" = "full" ]; then
+          echo "全量模块列表: $ALL_MODULE_LIST"
+          
+          # 2. 根据构建策略决定使用全量还是增量
+          BUILD_STRATEGY="${{ github.event.inputs.build_strategy || 'incremental' }}"
+          
+          if [ "$BUILD_STRATEGY" = "full" ]; then
             echo "使用全量构建策略"
             echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-
-          # 增量构建逻辑（原有逻辑）
+          
+          # 3. 增量构建逻辑（原有逻辑）
           CHANGED_MODULES=()
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-
+          echo "变更文件列表: $CHANGED_FILES"
+          
           while IFS= read -r file; do
             if [[ "$file" == *"pom.xml" ]]; then
               DIR=$(dirname "$file")
-              if [ "$DIR" != "." ]; then
+              if [ "$DIR" != "." ] && [[ "$DIR" != *"/target/"* ]]; then
                 CHANGED_MODULES+=("$DIR")
               fi
             fi
           done <<< "$CHANGED_FILES"
-
+          
+          # 去重
           UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
-
+          
           if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
             echo "No module changes detected."
             echo "changed_modules=none" >> $GITHUB_OUTPUT
@@ -83,7 +89,6 @@ jobs:
             echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
-
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
