@@ -231,8 +231,8 @@
     <distributionManagement>
         <repository>
             <id>codeartifact</id>
-            <name>magic-bag-magic_bag</name>
-            <url>https://magic-bag-838811708767.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic_bag/</url>
+            <name>se-magic-bag</name>
+            <url>https://se-935194211492.d.codeartifact.ap-southeast-1.amazonaws.com/maven/magic-bag/</url>
         </repository>
     </distributionManagement>
 </project>

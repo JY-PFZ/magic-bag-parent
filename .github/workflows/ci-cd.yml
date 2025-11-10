@@ -32,11 +32,10 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 2
-
       - name: 📋 Set Deployment Type
         id: set_output
         env:
-          DEPLOY_TYPE: ${{ github.event.inputs.deploy_type }}  # 通过环境变量传递输入值
+          DEPLOY_TYPE: ${{ github.event.inputs.deploy_type || 'all' }}
         run: |
           echo "DEPLOY_TYPE: $DEPLOY_TYPE"  # 调试输出
           if [ "$DEPLOY_TYPE" == "all" ]; then
@@ -69,7 +68,6 @@ jobs:
             echo "Invalid deploy_type: $DEPLOY_TYPE"
             exit 1
           fi
-
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
