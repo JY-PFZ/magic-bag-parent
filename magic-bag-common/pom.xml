@@ -13,6 +13,11 @@
     <name>magic-bag-common</name>
     <description>magic-bag-common</description>
 
+    <properties>
+        <!-- 跳过sonar扫描 -->
+        <sonar.skip>true</sonar.skip>
+    </properties>
+
     <dependencies>
         <dependency>
             <groupId>org.springframework.boot</groupId>

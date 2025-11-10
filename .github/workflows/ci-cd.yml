@@ -187,20 +187,24 @@ jobs:
           done
 
       - name: 📊 SonarQube Scan (Changed Modules Only)
-        env:
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
-          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
             if [ -f "$MODULE/pom.xml" ]; then
+              # 清理模块名：替换 / 和 . 为 -
+              SAFE_MODULE=$(echo "$MODULE" | sed 's|[/.]|-|g')
+              PROJECT_KEY="magicbag-$SAFE_MODULE"
+              JACOCO_REPORT="$MODULE/target/site/jacoco/jacoco.xml"
+          
               echo "🔍 Scanning $MODULE with SonarQube..."
               mvn -B -pl "$MODULE" -am sonar:sonar \
               -s /tmp/m2-cache/settings.xml \
               -Dmaven.repo.local=/tmp/m2-cache \
-              -Dsonar.login="$SONAR_TOKEN" \
-              -Dsonar.host.url="$SONAR_HOST_URL" \
-              -Dsonar.projectKey="magicbag-$MODULE"
+              -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
+              -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
+              -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+              -Dsonar.projectKey="$PROJECT_KEY" \
+              -Dsonar.coverage.jacoco.xmlReportPaths="$JACOCO_REPORT"
             fi
           done
 
