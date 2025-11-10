@@ -2,12 +2,20 @@ package nus.iss.se.merchant.service.impl;
 
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
+import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import nus.iss.se.common.constant.ResultStatus;
 import nus.iss.se.common.exception.BusinessException;
+import nus.iss.se.kafka.event.EventEnvelope;
+import nus.iss.se.kafka.publisher.KafkaEventPublisher;
+import nus.iss.se.merchant.common.UserContextHolder;
 import nus.iss.se.merchant.dto.MerchantDto;
 import nus.iss.se.merchant.dto.MerchantUpdateDto;
 import nus.iss.se.merchant.entity.Merchant;
+import nus.iss.se.merchant.kafka.EventTopicType;
+import nus.iss.se.merchant.kafka.event.MerchantRegisterEvent;
 import nus.iss.se.merchant.mapper.MerchantMapper;
 import nus.iss.se.merchant.service.IMerchantService;
 import org.springframework.beans.BeanUtils;
@@ -16,25 +24,25 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
-public class MerchantServiceImpl implements IMerchantService {
-
-    private final MerchantMapper merchantMapper;
+public class MerchantServiceImpl extends ServiceImpl<MerchantMapper, Merchant> implements IMerchantService{
+    private final ObjectMapper objectMapper;
+    private   final KafkaEventPublisher eventPublisher;
+    private final UserContextHolder userContextHolder;
 
     @Override
     public List<MerchantDto> getAllMerchants() {
-        List<Merchant> merchants = merchantMapper.findAllApprovedMerchants();
+        List<Merchant> merchants = baseMapper.findAllApprovedMerchants();
         return merchants.stream()
                 .map(this::convertToDto)
-                .collect(Collectors.toList());
+                .toList();
     }
 
     @Override
     public MerchantDto getMerchantById(Integer id) {
-        Merchant merchant = merchantMapper.selectById(id);
+        Merchant merchant = baseMapper.selectById(id);
         if (merchant == null) {
             return null;
         }
@@ -43,7 +51,7 @@ public class MerchantServiceImpl implements IMerchantService {
 
     @Override
     public Integer getMerchantIdByUserId(Integer userId) {
-        Merchant merchant = merchantMapper.selectById(userId);
+        Merchant merchant = baseMapper.selectById(userId);
         if (merchant != null) {
             return merchant.getId();
         }
@@ -52,7 +60,7 @@ public class MerchantServiceImpl implements IMerchantService {
     
     @Override
     public MerchantDto findByUserId(Integer userId) {
-        Merchant merchant = merchantMapper.findByUserId(userId);
+        Merchant merchant = baseMapper.findByUserId(userId);
         if (merchant == null) {
             return null;
         }
@@ -61,9 +69,10 @@ public class MerchantServiceImpl implements IMerchantService {
     
     @Override
     @Transactional(rollbackFor = Exception.class)
-    public void registerMerchant(MerchantUpdateDto merchantDto, Integer userId) {
+    public void registerMerchant(MerchantUpdateDto merchantDto) {
         // 检查是否已经注册过商户
-        Merchant existingMerchant = merchantMapper.findByUserId(userId);
+        Integer userId = userContextHolder.userId();
+        Merchant existingMerchant = baseMapper.findByUserId(userId);
         if (existingMerchant != null) {
             throw new BusinessException(ResultStatus.FAIL, "用户已经注册过商户");
         }
@@ -77,10 +86,20 @@ public class MerchantServiceImpl implements IMerchantService {
         merchant.setStatus("pending"); // 待审核状态
         merchant.setCreatedAt(new Date());
         merchant.setUpdatedAt(new Date());
-        
-        int result = merchantMapper.insert(merchant);
-        if (result <= 0) {
-            throw new BusinessException(ResultStatus.FAIL, "注册商户失败");
+
+        save(merchant);
+
+        try {
+            MerchantRegisterEvent event = new MerchantRegisterEvent();
+            event.setUserId(userId);
+            event.setMerchantId(merchant.getId());
+            event.setShopName(merchant.getName());
+
+            String data = objectMapper.writeValueAsString(event);
+            EventEnvelope eventEnvelope = EventEnvelope.of(data, EventTopicType.MERCHANT_REGISTERED);
+            eventPublisher.publish(eventEnvelope);
+        } catch (JsonProcessingException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -92,7 +111,7 @@ public class MerchantServiceImpl implements IMerchantService {
             throw new BusinessException(ResultStatus.MERCHANT_NOT_FOUND, "当前用户不是商户");
         }
 
-        Merchant merchant = merchantMapper.selectById(merchantId);
+        Merchant merchant = baseMapper.selectById(merchantId);
         if (merchant == null) {
             throw new BusinessException(ResultStatus.MERCHANT_NOT_FOUND, "商户不存在");
         }
@@ -103,7 +122,7 @@ public class MerchantServiceImpl implements IMerchantService {
         merchant.setAddress(merchantDto.getAddress());
         merchant.setUpdatedAt(new Date());
 
-        int result = merchantMapper.updateById(merchant);
+        int result = baseMapper.updateById(merchant);
         if (result <= 0) {
             throw new BusinessException(ResultStatus.FAIL, "更新商户信息失败");
         }
@@ -112,12 +131,12 @@ public class MerchantServiceImpl implements IMerchantService {
     @Override
     public IPage<MerchantDto> sortedMerchantsByScore(Integer current, Integer size, Integer minScore) {
         Page<Merchant> page = new Page<>(current, size);
-        IPage<Merchant> merchantPage = merchantMapper.findMerchantsByScore(page, minScore.doubleValue());
+        IPage<Merchant> merchantPage = baseMapper.findMerchantsByScore(page, minScore.doubleValue());
 
         IPage<MerchantDto> dtoPage = new Page<>(current, size, merchantPage.getTotal());
         List<MerchantDto> merchantDtos = merchantPage.getRecords().stream()
                 .map(this::convertToDto)
-                .collect(Collectors.toList());
+                .toList();
         dtoPage.setRecords(merchantDtos);
 
         return dtoPage;

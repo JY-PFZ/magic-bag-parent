@@ -71,11 +71,7 @@ public class MerchantController {
     @PostMapping("/register")
     @Operation(summary = "注册商家信息", description = "用户注册自己的店铺信息")
     public Result<Void> registerMerchantProfile(@RequestBody @Valid MerchantUpdateDto merchantDto) {
-        UserContext currentUser = userContextHolder.getCurrentUser();
-        if (currentUser == null || currentUser.getId() == null) {
-            throw new BusinessException(ResultStatus.FAIL, "User context not found.");
-        }
-        merchantService.registerMerchant(merchantDto, currentUser.getId());
+        merchantService.registerMerchant(merchantDto);
         return Result.success();
     }
 

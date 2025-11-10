@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import nus.iss.se.common.constant.RedisPrefix;
+import nus.iss.se.merchant.dto.MerchantDto;
 import nus.iss.se.merchant.dto.MerchantLocationDto;
 import nus.iss.se.common.util.RedisUtil;
 import org.springframework.data.geo.*;
@@ -24,22 +25,15 @@ import java.util.*;
 @Slf4j
 public class MerchantLocationService {
     private final RedisUtil redisUtil;
+    private final IMerchantService merchantService;
     private final StringRedisTemplate redisTemplate;
 
     // 初始化：将店铺数据加载到 Redis GEO（可从数据库同步）
     @PostConstruct
     public void init() {
-        Map<String, Point> stores = new HashMap<>();
-        stores.put("S001", new Point(116.4074, 39.9042)); // 注意：先经度，后纬度
-        stores.put("S002", new Point(116.3284, 39.9447));
-        stores.put("S003", new Point(121.4737, 31.2304));
-        stores.put("S004", new Point(114.0579, 22.5431));
-        stores.put("S005", new Point(104.0667, 30.6555));
-
-        GeoOperations<String, String> geoOps = redisTemplate.opsForGeo();
-
-        stores.forEach((name, point) -> geoOps.add(RedisPrefix.MERCHANT_LOCATION.getCode(), point, name));
-        log.info("Merchant location data initialized with {} stores", stores.size());
+        List<MerchantDto> merchants = merchantService.getAllMerchants();
+        merchants.forEach(item -> redisUtil.setGeo(RedisPrefix.MERCHANT_LOCATION.getCode(),new Point(item.getLongitude().doubleValue(),item.getLatitude().doubleValue()),item.getName()));
+        log.info("Merchant location data initialized with {} stores", merchants.size());
     }
 
     /**
