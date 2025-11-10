@@ -200,9 +200,7 @@ jobs:
               -Dmaven.repo.local=/tmp/m2-cache \
               -Dsonar.login="$SONAR_TOKEN" \
               -Dsonar.host.url="$SONAR_HOST_URL" \
-              -Dsonar.projectKey=magicbag-$MODULE \
-              -Dsonar.sources=./$MODULE \
-              -Dsonar.java.binaries=./$MODULE/target
+              -Dsonar.projectKey="magicbag-$MODULE"
             fi
           done
 
