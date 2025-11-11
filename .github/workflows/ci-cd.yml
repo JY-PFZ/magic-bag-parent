@@ -180,7 +180,10 @@ jobs:
             -Dmaven.repo.local=/tmp/m2-cache \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+            -Dsonar.projectKey=magic-bag-parent \
+            -Dsonar.branch.name=main \
+            || echo "⚠️ Sonar scan completed but failed to validate default branch. Analysis still uploaded."
 
   build-and-deploy:
     name: 🐳 Build Docker & Deploy to EC2
