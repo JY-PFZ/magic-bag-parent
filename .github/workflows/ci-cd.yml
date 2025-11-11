@@ -281,35 +281,51 @@ jobs:
               -Dmaven.repo.local=/tmp/m2-cache
           done
 
-      - name: 🐳 Build Docker Images (Only Changed)
+      - name: 🐳 Build Docker Images (Only Changed + Has Dockerfile)
+        id: build_images
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          BUILT_IMAGES=()
           for MODULE in "${MODULES[@]}"; do
-            CLEAN_MODULE="${MODULE#./}"
-            if [ -f "$MODULE/Dockerfile" ]; then
-              IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest"
-              echo "🐳 Building ${CLEAN_MODULE} → ${IMAGE_NAME} ..."
-
-              case "${CLEAN_MODULE}" in
-                "magic-bag-gateway") PORT=10016 ;;
-                "magic-bag-auth") PORT=10017 ;;
-                "magic-bag-user") PORT=10018 ;;
-                "magic-bag-product") PORT=10019 ;;
-                "magic-bag-order") PORT=10020 ;;
-                "magic-bag-payment") PORT=10021 ;;
-                "magic-bag-cart") PORT=10022 ;;
-                "magic-bag-merchant") PORT=10023 ;;
-                "magic-bag-admin") PORT=10024 ;;
-                *) PORT=8080 ;;
-              esac
-
-              docker build -f "$MODULE/Dockerfile" \
-                --build-arg SERVICE_NAME="${CLEAN_MODULE}" \
-                --build-arg APP_PORT="$PORT" \
-                --build-arg TZ=Asia/Singapore \
-                -t "$IMAGE_NAME" .
+            if [ ! -f "$MODULE/Dockerfile" ]; then
+              echo "⚠️ Skip $MODULE: no Dockerfile"
+              continue
             fi
+
+            CLEAN_MODULE="${MODULE#./}"
+            IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest"
+            echo "🐳 Building ${CLEAN_MODULE} → ${IMAGE_NAME} ..."
+
+            case "${CLEAN_MODULE}" in
+              "magic-bag-gateway") PORT=10016 ;;
+              "magic-bag-auth") PORT=10017 ;;
+              "magic-bag-user") PORT=10018 ;;
+              "magic-bag-product") PORT=10019 ;;
+              "magic-bag-order") PORT=10020 ;;
+              "magic-bag-payment") PORT=10021 ;;
+              "magic-bag-cart") PORT=10022 ;;
+              "magic-bag-merchant") PORT=10023 ;;
+              "magic-bag-admin") PORT=10024 ;;
+              *) PORT=8080 ;;
+            esac
+
+            docker build -f "$MODULE/Dockerfile" \
+              --build-arg SERVICE_NAME="${CLEAN_MODULE}" \
+              --build-arg APP_PORT="$PORT" \
+              --build-arg TZ=Asia/Singapore \
+              -t "$IMAGE_NAME" .
+
+            # 记录成功构建的模块名（用于后续推送）
+            BUILT_IMAGES+=("${CLEAN_MODULE}")
           done
+
+          # 输出构建成功的模块列表（供后续步骤使用）
+          if [ ${#BUILT_IMAGES[@]} -eq 0 ]; then
+            echo "built_modules=" >> $GITHUB_OUTPUT
+          else
+            BUILT_LIST=$(IFS=','; echo "${BUILT_IMAGES[*]}")
+            echo "built_modules=$BUILT_LIST" >> $GITHUB_OUTPUT
+          fi
 
       - name: 🔐 Login to Docker Hub
         uses: docker/login-action@v3
@@ -317,12 +333,19 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: 🚀 Push Changed Images to Docker Hub
+      - name: 🚀 Push Built Docker Images Only
         run: |
-          IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
+          BUILT_MODULES="${{ steps.build_images.outputs.built_modules }}"
+          if [ -z "$BUILT_MODULES" ]; then
+            echo "📭 No Docker images built. Skipping push."
+            exit 0
+          fi
+
+          IFS=',' read -ra MODULES <<< "$BUILT_MODULES"
           for MODULE in "${MODULES[@]}"; do
-            CLEAN_MODULE="${MODULE#./}"
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest
+            IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${MODULE}:latest"
+            echo "📤 Pushing $IMAGE_NAME ..."
+            docker push "$IMAGE_NAME"
           done
 
       - name: 🌐 Deploy to EC2 via SSH
