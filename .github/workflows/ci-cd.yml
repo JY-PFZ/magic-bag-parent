@@ -11,8 +11,8 @@ on:
         default: 'full'
         type: choice
         options:
-          - incremental  # 仅构建修改的服务
-          - full         # 构建所有服务
+          - incremental # 仅构建修改的服务
+          - full        # 构建所有服务
 
 env:
   DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -31,12 +31,11 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
         with:
-          fetch-depth: 2  # 需要比较上一次提交
+          fetch-depth: 2
 
       - name: 📂 Identify Modules (Full/Incremental)
         id: set_output
         run: |
-          # 1. 获取全量模块列表（所有包含 pom.xml 的子目录）
           ALL_MODULES=()
           while IFS= read -r file; do
             DIR=$(dirname "$file")
@@ -44,34 +43,24 @@ jobs:
               ALL_MODULES+=("$DIR")
             fi
           done <<< "$(find . -name 'pom.xml' -not -path './pom.xml')"
-          
           UNIQUE_ALL_MODULES=($(printf "%s\n" "${ALL_MODULES[@]}" | sort -u))
           ALL_MODULE_LIST=$(IFS=','; echo "${UNIQUE_ALL_MODULES[*]}")
-          echo "全量模块列表: $ALL_MODULE_LIST"
-          
-          # 2. 检查构建策略，全量构建直接返回所有模块
+
           BUILD_STRATEGY="${{ github.event.inputs.build_strategy || 'incremental' }}"
           if [ "$BUILD_STRATEGY" = "full" ]; then
-            echo "使用全量构建策略"
             echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
-          # 3. 增量构建逻辑优化
-          CHANGED_MODULES=()
+
           CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
-          echo "变更文件列表: $CHANGED_FILES"
-          
-          # 检测是否有 workflow 配置变更（需要触发全量构建）
           if echo "$CHANGED_FILES" | grep -q ".github/workflows/"; then
-            echo "检测到 workflow 配置变更，触发全量构建"
             echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
             exit 0
           fi
-          
-          # 检测 pom.xml 变更
+
+          CHANGED_MODULES=()
           while IFS= read -r file; do
             if [[ "$file" == *"pom.xml" ]]; then
               DIR=$(dirname "$file")
@@ -80,20 +69,17 @@ jobs:
               fi
             fi
           done <<< "$CHANGED_FILES"
-          
-          # 去重处理
+
           UNIQUE_MODULES=($(printf "%s\n" "${CHANGED_MODULES[@]}" | sort -u))
-          
           if [ ${#UNIQUE_MODULES[@]} -eq 0 ]; then
-            echo "No module changes detected."
-            echo "changed_modules=none" >> $GITHUB_OUTPUT
+            echo "changed_modules=" >> $GITHUB_OUTPUT
             echo "has_changes=false" >> $GITHUB_OUTPUT
           else
             MODULE_LIST=$(IFS=','; echo "${UNIQUE_MODULES[*]}")
-            echo "Changed modules: $MODULE_LIST"
             echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
+
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
@@ -172,7 +158,7 @@ jobs:
           </settings>
           EOF
 
-      - name: 🧪 Build Only Changed Microservices
+      - name: 🧪 Build Only Changed Microservices (for tests)
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
@@ -186,23 +172,15 @@ jobs:
               -Dmaven.repo.local=/tmp/m2-cache
           done
 
-      - name: 📊 SonarQube Scan
-        if: steps.detect-changes.outputs.changed_modules != ''
+      - name: 📊 SonarQube Scan (Full Multi-module Project)
         run: |
-          echo "🔍 At least one module changed. Scanning full multi-module project..."
+          echo "🔍 Scanning full project for SonarQube..."
           mvn -B clean verify sonar:sonar \
             -s /tmp/m2-cache/settings.xml \
             -Dmaven.repo.local=/tmp/m2-cache \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
             -Dsonar.token=${{ secrets.SONAR_TOKEN }}
-
-      - name: 📤 Upload Built JARs (Only Changed)
-        uses: actions/upload-artifact@v4
-        with:
-          name: built-jars
-          path: |
-            ${{ needs.detect-changes.outputs.changed_modules }}/target/*.jar
 
   build-and-deploy:
     name: 🐳 Build Docker & Deploy to EC2
@@ -213,25 +191,85 @@ jobs:
       - name: 📥 Checkout Code
         uses: actions/checkout@v4
 
-      - name: 📥 Download Built JARs
-        uses: actions/download-artifact@v4
+      - name: ⏱️ Cache Maven packages
+        uses: actions/cache@v3
         with:
-          name: built-jars
-          path: .
+          path: /tmp/m2-cache
+          key: ${{ runner.os }}-m2-${{ hashFiles('**/pom.xml') }}
+          restore-keys: |
+            ${{ runner.os }}-m2-
 
-      - name: 🔁 Restore JARs to target Directories
+      - name: ⚙️ Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: ⚙️ Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: 🔑 Generate CodeArtifact settings.xml
+        run: |
+          TOKEN=$(aws codeartifact get-authorization-token \
+            --domain se \
+            --domain-owner 935194211492 \
+            --region ${{ env.AWS_REGION }} \
+            --query authorizationToken --output text)
+          REPO_URL="https://se-935194211492.d.codeartifact.${{ env.AWS_REGION }}.amazonaws.com/maven/magic-bag/"
+          mkdir -p /tmp/m2-cache
+          cat > /tmp/m2-cache/settings.xml << EOF
+          <settings>
+            <servers>
+              <server>
+                <id>codeartifact</id>
+                <username>aws</username>
+                <password>${TOKEN}</password>
+              </server>
+            </servers>
+            <profiles>
+              <profile>
+                <id>codeartifact</id>
+                <repositories>
+                  <repository>
+                    <id>codeartifact</id>
+                    <url>${REPO_URL}</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </repository>
+                </repositories>
+                <pluginRepositories>
+                  <pluginRepository>
+                    <id>codeartifact</id>
+                    <url>${REPO_URL}</url>
+                    <releases><enabled>true</enabled></releases>
+                    <snapshots><enabled>true</enabled></snapshots>
+                  </pluginRepository>
+                </pluginRepositories>
+              </profile>
+            </profiles>
+            <activeProfiles>
+              <activeProfile>codeartifact</activeProfile>
+            </activeProfiles>
+          </settings>
+          EOF
+
+      - name: 🧪 Rebuild Changed Modules (for packaging)
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
-            mkdir -p "$MODULE/target"
-            JAR=$(find . -name "${MODULE}-*.jar" | head -n1)
-            if [ -n "$JAR" ]; then
-              cp "$JAR" "$MODULE/target/app.jar"
-              echo "✅ Copied $JAR to $MODULE/target/app.jar"
-            else
-              echo "❌ JAR not found for $MODULE"
-              exit 1
+            if [ ! -f "$MODULE/pom.xml" ]; then
+              echo "⚠️ Skip $MODULE: no pom.xml"
+              continue
             fi
+            echo "📦 Packaging $MODULE..."
+            mvn -B -pl "$MODULE" package -DskipTests \
+              -s /tmp/m2-cache/settings.xml \
+              -Dmaven.repo.local=/tmp/m2-cache
           done
 
       - name: 🐳 Build Docker Images (Only Changed)
