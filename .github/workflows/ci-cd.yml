@@ -279,27 +279,33 @@ jobs:
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
-            if [ -f "$MODULE/Dockerfile" ]; then
-              BASE_NAME=$(echo "$MODULE" | cut -d'-' -f3-)
-              case "$BASE_NAME" in
-                "gateway") PORT=10016 ;;
-                "auth") PORT=10017 ;;
-                "user") PORT=10018 ;;
-                "product") PORT=10019 ;;
-                "order") PORT=10020 ;;
-                "payment") PORT=10021 ;;
-                "cart") PORT=10022 ;;
-                "merchant") PORT=10023 ;;
-                "admin") PORT=10024 ;;
-                *) PORT=8080 ;;
-              esac
-              echo "🐳 Building $MODULE on port $PORT..."
-              docker build -f "$MODULE/Dockerfile" \
-                --build-arg SERVICE_NAME="$MODULE" \
-                --build-arg APP_PORT="$PORT" \
-                --build-arg TZ=Asia/Singapore \
-                -t ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest .
-            fi
+          # 去掉开头的 ./ （如果存在）
+          CLEAN_MODULE="${MODULE#./}"
+          if [ -f "$MODULE/Dockerfile" ]; then
+          # 使用 CLEAN_MODULE 作为镜像名
+          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest"
+          echo "🐳 Building ${CLEAN_MODULE} → ${IMAGE_NAME} ..."
+          
+          # 确定端口（可选）
+          case "${CLEAN_MODULE}" in
+          "magic-bag-gateway") PORT=10016 ;;
+          "magic-bag-auth") PORT=10017 ;;
+          "magic-bag-user") PORT=10018 ;;
+          "magic-bag-product") PORT=10019 ;;
+          "magic-bag-order") PORT=10020 ;;
+          "magic-bag-payment") PORT=10021 ;;
+          "magic-bag-cart") PORT=10022 ;;
+          "magic-bag-merchant") PORT=10023 ;;
+          "magic-bag-admin") PORT=10024 ;;
+          *) PORT=8080 ;;
+          esac
+          
+          docker build -f "$MODULE/Dockerfile" \
+          --build-arg SERVICE_NAME="${CLEAN_MODULE}" \
+          --build-arg APP_PORT="$PORT" \
+          --build-arg TZ=Asia/Singapore \
+          -t "$IMAGE_NAME" .
+          fi
           done
 
       - name: 🔐 Login to Docker Hub
