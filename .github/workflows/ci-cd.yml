@@ -261,6 +261,12 @@ jobs:
           </settings>
           EOF
 
+      # ✅ 关键修复：将 settings.xml 放入 .m2/ 目录，供 Docker 挂载
+      - name: 📁 Prepare .m2/settings.xml for Docker build (no Dockerfile change)
+        run: |
+          mkdir -p .m2
+          cp /tmp/m2-cache/settings.xml .m2/settings.xml
+
       - name: 🧪 Rebuild Changed Modules (for packaging)
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
@@ -279,33 +285,30 @@ jobs:
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
-          # 去掉开头的 ./ （如果存在）
-          CLEAN_MODULE="${MODULE#./}"
-          if [ -f "$MODULE/Dockerfile" ]; then
-          # 使用 CLEAN_MODULE 作为镜像名
-          IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest"
-          echo "🐳 Building ${CLEAN_MODULE} → ${IMAGE_NAME} ..."
-          
-          # 确定端口（可选）
-          case "${CLEAN_MODULE}" in
-          "magic-bag-gateway") PORT=10016 ;;
-          "magic-bag-auth") PORT=10017 ;;
-          "magic-bag-user") PORT=10018 ;;
-          "magic-bag-product") PORT=10019 ;;
-          "magic-bag-order") PORT=10020 ;;
-          "magic-bag-payment") PORT=10021 ;;
-          "magic-bag-cart") PORT=10022 ;;
-          "magic-bag-merchant") PORT=10023 ;;
-          "magic-bag-admin") PORT=10024 ;;
-          *) PORT=8080 ;;
-          esac
-          
-          docker build -f "$MODULE/Dockerfile" \
-          --build-arg SERVICE_NAME="${CLEAN_MODULE}" \
-          --build-arg APP_PORT="$PORT" \
-          --build-arg TZ=Asia/Singapore \
-          -t "$IMAGE_NAME" .
-          fi
+            CLEAN_MODULE="${MODULE#./}"
+            if [ -f "$MODULE/Dockerfile" ]; then
+              IMAGE_NAME="${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest"
+              echo "🐳 Building ${CLEAN_MODULE} → ${IMAGE_NAME} ..."
+
+              case "${CLEAN_MODULE}" in
+                "magic-bag-gateway") PORT=10016 ;;
+                "magic-bag-auth") PORT=10017 ;;
+                "magic-bag-user") PORT=10018 ;;
+                "magic-bag-product") PORT=10019 ;;
+                "magic-bag-order") PORT=10020 ;;
+                "magic-bag-payment") PORT=10021 ;;
+                "magic-bag-cart") PORT=10022 ;;
+                "magic-bag-merchant") PORT=10023 ;;
+                "magic-bag-admin") PORT=10024 ;;
+                *) PORT=8080 ;;
+              esac
+
+              docker build -f "$MODULE/Dockerfile" \
+                --build-arg SERVICE_NAME="${CLEAN_MODULE}" \
+                --build-arg APP_PORT="$PORT" \
+                --build-arg TZ=Asia/Singapore \
+                -t "$IMAGE_NAME" .
+            fi
           done
 
       - name: 🔐 Login to Docker Hub
@@ -318,7 +321,8 @@ jobs:
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
-            docker push ${{ secrets.DOCKERHUB_USERNAME }}/"$MODULE":latest
+            CLEAN_MODULE="${MODULE#./}"
+            docker push ${{ secrets.DOCKERHUB_USERNAME }}/${CLEAN_MODULE}:latest
           done
 
       - name: 🌐 Deploy to EC2 via SSH
