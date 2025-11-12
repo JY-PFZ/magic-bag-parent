@@ -22,14 +22,14 @@ public class MagicBag {
     private Integer merchantId;
     private String title;
     private String description;
-    private float price;
+    private Float price;
     private Integer quantity;
     private LocalTime pickupStartTime;
     private LocalTime pickupEndTime;
     private Date availableDate;
     private String category;
     private String imageUrl;
-    private Boolean isActive;
+    private boolean isActive;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
 }

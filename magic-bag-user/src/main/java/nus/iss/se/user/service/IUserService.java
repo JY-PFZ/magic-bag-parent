@@ -11,7 +11,7 @@ public interface IUserService extends IService<User> {
 
     void register(RegisterReq req);
 
-    User updateUserInfo(User user);
+    void updateUserInfo(UserDto userDto);
 
     void editUser(UserDto dto);
 

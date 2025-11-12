@@ -22,9 +22,9 @@ public class UserContextInterceptor implements HandlerInterceptor {
         String username = request.getHeader("X-Username");
         if (username != null) {
             UserContext userContext = userCacheService.getCachedUser(username);
-            if (userContext != null && !userContext.getRole().contains(UserRole.ADMIN.getCode()) && !userContext.getRole().contains(UserRole.SUPER_ADMIN.getCode())){
-                throw new Exception("Without admin privileges, access is not possible.");
-            }
+//            if (userContext != null && !userContext.getRole().contains(UserRole.ADMIN.getCode()) && !userContext.getRole().contains(UserRole.SUPER_ADMIN.getCode())){
+//                throw new Exception("Without admin privileges, access is not possible.");
+//            }
             userContextHolder.setCurrentUser(userContext);
         }
         return true;

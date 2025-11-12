@@ -6,10 +6,14 @@ import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import nus.iss.se.common.cache.UserCacheService;
+import nus.iss.se.common.cache.UserContext;
 import nus.iss.se.common.constant.ResultStatus;
 import nus.iss.se.common.exception.BusinessException;
 import nus.iss.se.kafka.event.EventEnvelope;
 import nus.iss.se.kafka.publisher.KafkaEventPublisher;
+import nus.iss.se.user.common.UserContextHolder;
 import nus.iss.se.user.common.UserRole;
 import nus.iss.se.user.common.UserStatus;
 import nus.iss.se.user.dto.RegisterReq;
@@ -23,17 +27,18 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.util.Date;
+import java.util.Objects;
 import java.util.Optional;
 
+@Slf4j
 @Service
+@RequiredArgsConstructor
 public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IUserService {
     private final PasswordEncoder passwordEncoder;
     private final KafkaEventPublisher eventPublisher;
-    
-    public UserServiceImpl(PasswordEncoder passwordEncoder, KafkaEventPublisher eventPublisher) {
-        this.passwordEncoder = passwordEncoder;
-        this.eventPublisher = eventPublisher;
-    }
+    private final UserContextHolder userContextHolder;
+    private final UserCacheService userCacheService;
 
     @Override
     public User findByUsername(String username) {
@@ -63,16 +68,55 @@ public class UserServiceImpl extends ServiceImpl<UserMapper, User> implements IU
     }
 
     @Override
-    public User updateUserInfo(User dto) {
-        if (StringUtils.isBlank(dto.getUsername())) {
-            throw new BusinessException(ResultStatus.USER_NOT_FOUND, "username is null or blank");
+    public void updateUserInfo(UserDto dto) {
+        UserContext currentUser = userContextHolder.getCurrentUser();
+        // 1. 权限验证
+        if (!Objects.equals(currentUser.getId(), dto.getId())) {
+            throw new BusinessException(ResultStatus.ACCESS_DENIED, "无权限修改他人信息");
         }
-        User user = findByUsername(dto.getUsername());
-        user.setAvatar(dto.getAvatar());
-        user.setNickname(dto.getNickname());
-        updateById(user);
 
-        return user;
+        // **核心修复：将 "CUSTOMER" 添加为合法的角色**
+        String userRole = currentUser.getRole();
+        if (!"CUSTOMER".equals(userRole) && !"MERCHANT".equals(userRole)) {
+            throw new BusinessException(ResultStatus.ACCESS_DENIED, "角色权限不足");
+        }
+
+        // 3. 手机号唯一性验证
+        if (org.springframework.util.StringUtils.hasText(dto.getPhone())) {
+            User existingUser = baseMapper.selectByPhone(dto.getPhone());
+            if (existingUser != null && !Objects.equals(existingUser.getId(), dto.getId())) {
+                throw new BusinessException(ResultStatus.USER_HAS_EXISTED, "手机号已被其他用户使用");
+            }
+        }
+
+        // 4. 更新用户信息
+        LambdaUpdateWrapper<User> wrapper = new LambdaUpdateWrapper<>();
+        wrapper.eq(User::getId, dto.getId());
+
+        if (org.springframework.util.StringUtils.hasText(dto.getNickname())) {
+            wrapper.set(User::getNickname, dto.getNickname());
+        }
+        if (org.springframework.util.StringUtils.hasText(dto.getAvatar())) {
+            wrapper.set(User::getAvatar, dto.getAvatar());
+        }
+        if (org.springframework.util.StringUtils.hasText(dto.getPhone())) {
+            wrapper.set(User::getPhone, dto.getPhone());
+        }
+
+        wrapper.set(User::getUpdatedAt, new Date());
+
+        boolean updated = update(wrapper);
+        if (!updated) {
+            throw new BusinessException(ResultStatus.FAIL, "用户信息更新失败");
+        }
+
+        // 5. 更新缓存
+        User updatedUser = baseMapper.selectById(dto.getId());
+        UserContext userContext = new UserContext();
+        BeanUtils.copyProperties(updatedUser, userContext);
+        userCacheService.updateCache(userContext);
+
+        log.info("用户 {} 更新个人信息成功", currentUser.getUsername());
     }
 
     @Override

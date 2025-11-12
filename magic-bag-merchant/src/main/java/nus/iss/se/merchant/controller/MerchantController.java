@@ -22,7 +22,7 @@ import java.util.List;
 
 @Slf4j
 @RestController
-@RequestMapping("/merchant/merchants")
+@RequestMapping("/merchant")
 @RequiredArgsConstructor
 @Tag(name = "Merchant API", description = "商户管理服务")
 public class MerchantController {
