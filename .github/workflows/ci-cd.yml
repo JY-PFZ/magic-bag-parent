@@ -162,15 +162,26 @@ jobs:
         run: |
           IFS=',' read -ra MODULES <<< "${{ needs.detect-changes.outputs.changed_modules }}"
           for MODULE in "${MODULES[@]}"; do
-            if [ ! -f "$MODULE/pom.xml" ]; then
-              echo "⚠️ Skip $MODULE: no pom.xml"
-              continue
-            fi
-            echo "📦 Building $MODULE..."
-            mvn -B -pl "$MODULE" clean compile test \
-              -s /tmp/m2-cache/settings.xml \
-              -Dmaven.repo.local=/tmp/m2-cache
+          if [ ! -f "$MODULE/pom.xml" ]; then
+           echo "⚠️ Skip $MODULE: no pom.xml"
+           continue
+          fi
+          echo "📦 Building $MODULE..."
+          mvn -B -pl "$MODULE" clean compile test \
+           -s /tmp/m2-cache/settings.xml \
+           -Dmaven.repo.local=/tmp/m2-cache
           done
+            
+      # 👇 新增：上传测试报告
+      - name: 📤 Upload Unit Test Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-test-reports-${{ github.run_id }}
+          path: |
+            **/target/surefire-reports/TEST-*.xml
+            **/target/surefire-reports/*.txt
+          retention-days: 7
 
       - name: 📊 SonarQube Scan (Full Multi-module Project)
         run: |

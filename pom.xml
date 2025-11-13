@@ -11,7 +11,7 @@
 
     <groupId>nus.iss.se</groupId>
     <artifactId>magic-bag-parent</artifactId>
-    <version>1.1.0</version>
+    <version>1.2.0-SNAPSHOT</version>
     <name>magic-bag-parent</name>
     <packaging>pom</packaging>
     <description>magic-bag-parent</description>
@@ -149,6 +149,11 @@
         <dependency>
             <groupId>org.springframework.security</groupId>
             <artifactId>spring-security-test</artifactId>
+            <scope>test</scope>
+        </dependency>
+        <dependency>
+            <groupId>org.mockito</groupId>
+            <artifactId>mockito-core</artifactId>
             <scope>test</scope>
         </dependency>
 
