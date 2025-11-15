@@ -195,19 +195,19 @@ jobs:
       # 👇 生成 HTML 报告（Snyk CLI 支持 JSON 转 HTML）
       - name: 📊 Generate Snyk HTML Report
         run: |
-          npm install -g @snyk/report
-          snyk-to-html -i snyk-report.json -o snyk-report.html || echo "HTML report generation skipped."
-          
-          # 👇 上传 SCA 报告为 Artifact
-          - name: 📤 Upload Snyk SCA Report
-            uses: actions/upload-artifact@v4
-            if: always()
-            with:
-              name: snyk-sca-report-${{ github.run_id }}
-              path: |
-                snyk-report.json
-                snyk-report.html
-              retention-days: 7
+          npm install -g snyk-to-html
+          snyk-to-html -i snyk-report.json -o snyk-report.html    
+
+      # 👇 上传 SCA 报告为 Artifact
+      - name: 📤 Upload Snyk SCA Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: snyk-sca-report-${{ github.run_id }}
+          path: |
+            snyk-report.json
+            snyk-report.html
+          retention-days: 7
 
       - name: 📊 SonarQube Scan (Full Multi-module Project)
         run: |
