@@ -68,23 +68,8 @@ public class CartController {
             @PathVariable Integer userId,
             @RequestParam Integer magicbagId,
             @RequestParam int quantity) {
-        
-        log.info("Adding item to cart: userId={}, magicbagId={}, quantity={}", 
-                userId, magicbagId, quantity);
-        
-        try {
-            if (quantity <= 0) {
-                throw new IllegalArgumentException("Quantity must be greater than 0");
-            }
-            return cartService.addItemToCart(userId, magicbagId, quantity);
-        } catch (IllegalArgumentException e) {
-            log.error("Invalid argument: {}", e.getMessage());
-            throw e;
-        } catch (Exception e) {
-            log.error("Error adding item to cart: userId={}, magicbagId={}, error={}", 
-                    userId, magicbagId, e.getMessage(), e);
-            throw e;
-        }
+
+        return cartService.addItemToCart(userId, magicbagId, quantity);
     }
     
     /**

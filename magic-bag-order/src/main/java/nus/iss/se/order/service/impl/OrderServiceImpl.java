@@ -1,5 +1,6 @@
 package nus.iss.se.order.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import lombok.RequiredArgsConstructor;
@@ -12,6 +13,7 @@ import nus.iss.se.order.api.MerchantClient;
 import nus.iss.se.order.api.ProductClient;
 import nus.iss.se.order.api.UserClient;
 import nus.iss.se.common.exception.BusinessException;
+import nus.iss.se.order.constant.UserRole;
 import nus.iss.se.order.dto.*;
 import nus.iss.se.order.dto.MerchantDto;
 import nus.iss.se.order.entity.Order;
@@ -24,6 +26,7 @@ import nus.iss.se.order.service.IOrderService;
 import org.springframework.beans.BeanUtils;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -46,36 +49,74 @@ public class OrderServiceImpl implements IOrderService {
     private final UserClient userClient;
     private final MerchantClient merchantClient;
     private final CartClient cartClient;
-    
+
     @Override
     public IPage<OrderDto> getOrders(UserContext currentUser, OrderQueryDto queryDto) {
         String userRole = currentUser.getRole();
         Page<OrderDto> page = new Page<>(queryDto.getPageNum(), queryDto.getPageSize());
-        
-        log.info("Fetching orders: role={}, userId={}, page={}, size={}", 
-                userRole, currentUser.getId(), queryDto.getPageNum(), queryDto.getPageSize());
-        
-        IPage<OrderDto> result;
-        switch (userRole) {
-            case "SUPER_ADMIN":
-            case "ADMIN":
-                result = orderMapper.findAllOrders(page);
-                log.info("Admin fetched {} orders", result.getRecords().size());
+
+        IPage<OrderDto> orderPage;
+
+        // 将字符串转换为枚举实例
+        UserRole role = UserRole.getByCode(userRole)
+                .orElseThrow(() -> new BusinessException(ResultStatus.ACCESS_DENIED));
+
+        switch (role) {
+            case SUPER_ADMIN, ADMIN:
+                orderPage = orderMapper.findAllOrders(page);
                 break;
-            case "MERCHANT":
-                result = orderMapper.findByMerchantId(page, currentUser.getId());
-                log.info("Merchant {} fetched {} orders", currentUser.getId(), result.getRecords().size());
+            case MERCHANT:
+                Integer merchantUserId = currentUser.getId();
+                MerchantDto merchant = merchantClient.getMerchantById(merchantUserId).getData();
+                if (merchant == null) {
+                    throw new BusinessException(ResultStatus.USER_NOT_FOUND, "Merchant user context not found.");
+                }
+                orderPage = orderMapper.findByMerchantId(page, merchant.getId());
                 break;
-            case "USER":
-                result = orderMapper.findByUserId(page, currentUser.getId());
-                log.info("User {} fetched {} orders", currentUser.getId(), result.getRecords().size());
+            case USER, CUSTOMER:
+                orderPage = orderMapper.findByUserId(page, currentUser.getId());
                 break;
             default:
-                log.error("Invalid user role: {}", userRole);
-                throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
+                throw new BusinessException(ResultStatus.ACCESS_DENIED);
         }
-        
-        return result;
+
+        // 对查询结果进行处理，填充 OrderItems 和其他信息
+        if (orderPage != null && orderPage.getRecords() != null) {
+            orderPage.getRecords().forEach(orderDto -> {
+                if ("cart".equalsIgnoreCase(orderDto.getOrderType())) {
+                    List<OrderItem> items = orderItemMapper.findByOrderId(orderDto.getId());
+                    orderDto.setOrderItems(items.stream()
+                            .map(this::convertToOrderItemDto)
+                            .toList());
+                }
+                if (orderDto.getBagId() != null) {
+                    MagicBagDto bag = productClient.getMagicBagById(orderDto.getBagId()).getData();
+                    if (bag != null) {
+                        orderDto.setBagTitle(bag.getTitle());
+                        MerchantDto m = merchantClient.getMerchantById(bag.getMerchantId()).getData();
+                        if (m != null) {
+                            orderDto.setMerchantName(m.getName());
+                        }
+                    }
+                } else if ("cart".equalsIgnoreCase(orderDto.getOrderType()) && !CollectionUtils.isEmpty(orderDto.getOrderItems())){
+                    OrderItemDto firstItemDto = orderDto.getOrderItems().getFirst();
+                    if (firstItemDto != null && firstItemDto.getMagicBagId() != null) {
+                        MagicBagDto bag = productClient.getMagicBagById(firstItemDto.getMagicBagId()).getData();
+                        if (bag != null) {
+                            orderDto.setBagTitle("Multiple Items");
+                            MerchantDto m = merchantClient.getMerchantById(bag.getMerchantId()).getData();
+                            if (m != null) {
+                                orderDto.setMerchantName(m.getName());
+                            }
+                        }
+                    }
+                }
+                UserDto user = userClient.getUserById(orderDto.getUserId()).getData();
+                orderDto.setUserName(user != null &&user.getNickname() != null ? user.getNickname() : user.getUsername());
+            });
+        }
+
+        return orderPage;
     }
     
     @Override

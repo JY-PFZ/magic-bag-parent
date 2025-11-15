@@ -1,5 +1,6 @@
 package nus.iss.se.cart.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -14,6 +15,7 @@ import nus.iss.se.cart.entity.CartItem;
 import nus.iss.se.cart.mapper.CartItemMapper;
 import nus.iss.se.cart.mapper.CartMapper;
 import nus.iss.se.cart.service.ICartService;
+import nus.iss.se.common.exception.BusinessException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -65,8 +67,7 @@ public class CartServiceImpl implements ICartService {
         // 验证产品是否存在
         Result<MagicBagDto> bagResult = productClient.getMagicBagById(magicBagId);
         if (!isResultSuccess(bagResult) || bagResult.getData() == null) {
-            log.error("Product not found: {}", magicBagId);
-            throw new IllegalArgumentException(ResultStatus.PRODUCT_NOT_FOUND.getMessage());
+            throw new BusinessException(ResultStatus.PRODUCT_NOT_FOUND,"detail: "+magicBagId);
         }
         
         // 获取或创建购物车
@@ -74,18 +75,16 @@ public class CartServiceImpl implements ICartService {
         if (cart == null) {
             cart = new Cart();
             cart.setUserId(userId);
-            cart.setCreatedAt(LocalDateTime.now());
-            cart.setUpdatedAt(LocalDateTime.now());
             cartMapper.insertCart(cart);
             log.info("Created new cart for user: {}", userId);
         }
         
         // 使用 QueryWrapper 检查购物车中是否已存在该商品
-        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
+        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CartItem::getCartId, cart.getCartId())
+                .eq(CartItem::getMagicBagId, magicBagId);
         CartItem existing = cartItemMapper.selectOne(queryWrapper);
-        
+
         if (existing != null) {
             // 更新数量 - 使用 updateById
             existing.setQuantity(existing.getQuantity() + quantity);
@@ -99,15 +98,10 @@ public class CartServiceImpl implements ICartService {
             item.setCartId(cart.getCartId());
             item.setMagicBagId(magicBagId);
             item.setQuantity(quantity);
-            item.setAddedAt(LocalDateTime.now());
             cartItemMapper.insert(item);
             log.info("Added new item to cart: cartId={}, magicBagId={}, quantity={}", 
                     cart.getCartId(), magicBagId, quantity);
         }
-        
-        // 更新购物车时间
-        cart.setUpdatedAt(LocalDateTime.now());
-        cartMapper.updateCart(cart);
         
         // 重新加载购物车项
         return getActiveCart(userId);

@@ -183,6 +183,32 @@ jobs:
             **/target/surefire-reports/*.txt
           retention-days: 7
 
+      # 👇 新增：Snyk SCA 扫描（依赖漏洞检测）
+      - name: 🔍 Run Snyk to check for vulnerabilities
+        uses: snyk/actions/maven@master
+        continue-on-error: true  # 即使有漏洞也继续流程（除非你想失败）
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        with:
+          args: --all-projects --json-file-output=snyk-report.json
+
+      # 👇 生成 HTML 报告（Snyk CLI 支持 JSON 转 HTML）
+      - name: 📊 Generate Snyk HTML Report
+        run: |
+          npm install -g @snyk/report
+          snyk-to-html -i snyk-report.json -o snyk-report.html || echo "HTML report generation skipped."
+          
+          # 👇 上传 SCA 报告为 Artifact
+          - name: 📤 Upload Snyk SCA Report
+            uses: actions/upload-artifact@v4
+            if: always()
+            with:
+              name: snyk-sca-report-${{ github.run_id }}
+              path: |
+                snyk-report.json
+                snyk-report.html
+              retention-days: 7
+
       - name: 📊 SonarQube Scan (Full Multi-module Project)
         run: |
           echo "🔍 Scanning full project for SonarQube..."
