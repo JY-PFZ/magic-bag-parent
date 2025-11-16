@@ -16,7 +16,6 @@ public class Merchant {
     private Integer userId;
     private String name;
     private String phone;
-    private String passwordHash;
     private String businessLicense;
     private String address;
     private BigDecimal latitude;

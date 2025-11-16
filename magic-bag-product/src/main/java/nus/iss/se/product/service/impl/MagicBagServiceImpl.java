@@ -81,7 +81,7 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  
         magicBag.setCreatedAt(LocalDateTime.now());
         magicBag.setUpdatedAt(LocalDateTime.now());
 
-        baseMapper.insert(magicBag);
+        save(magicBag);
 
         return convertToDto(magicBag);
     }

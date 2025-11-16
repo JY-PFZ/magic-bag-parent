@@ -37,7 +37,7 @@ public class SecurityChainConfig {
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
-                .cors(cors -> {})
+                .cors(cors -> {}) // This is safe because we use JWT-based authentication and do not rely on cookies.CSRF attacks are not applicable in stateless APIs using bearer tokens.
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(authz -> authz

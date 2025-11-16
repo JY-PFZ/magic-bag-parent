@@ -13,6 +13,7 @@ import nus.iss.se.order.api.MerchantClient;
 import nus.iss.se.order.api.ProductClient;
 import nus.iss.se.order.api.UserClient;
 import nus.iss.se.common.exception.BusinessException;
+import nus.iss.se.order.constant.OrderStatus;
 import nus.iss.se.order.constant.UserRole;
 import nus.iss.se.order.dto.*;
 import nus.iss.se.order.dto.MerchantDto;
@@ -29,6 +30,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.CollectionUtils;
 
 import java.math.BigDecimal;
+import java.security.SecureRandom;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
@@ -49,6 +51,8 @@ public class OrderServiceImpl implements IOrderService {
     private final UserClient userClient;
     private final MerchantClient merchantClient;
     private final CartClient cartClient;
+
+    private final SecureRandom random = new SecureRandom();
 
     @Override
     public IPage<OrderDto> getOrders(UserContext currentUser, OrderQueryDto queryDto) {
@@ -126,19 +130,18 @@ public class OrderServiceImpl implements IOrderService {
         
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
-            log.error("Order not found: {}", orderId);
-            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND);
+            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND, "id:"+orderId);
         }
-        
-        String userRole = currentUser.getRole();
-        
+
+        UserRole role = UserRole.getByCode(currentUser.getRole())
+                .orElseThrow(() -> new BusinessException(ResultStatus.ACCESS_DENIED));
+
         // 权限验证
-        switch (userRole) {
-            case "SUPER_ADMIN":
-            case "ADMIN":
+        switch (role) {
+            case SUPER_ADMIN, ADMIN:
                 log.info("Admin accessing order: {}", orderId);
                 break;
-            case "MERCHANT":
+            case MERCHANT:
                 if ("cart".equals(order.getOrderType())) {
                     // 多件商品订单：通过 order_items 验证权限
                     List<OrderItem> orderItems = orderItemMapper.findByOrderId(orderId);
@@ -177,7 +180,7 @@ public class OrderServiceImpl implements IOrderService {
                     }
                 }
                 break;
-            case "USER":
+            case USER:
                 if (!order.getUserId().equals(currentUser.getId())) {
                     log.error("User {} attempted to access order {} of another user", 
                             currentUser.getId(), orderId);
@@ -186,7 +189,7 @@ public class OrderServiceImpl implements IOrderService {
                 log.info("User {} accessing their order: {}", currentUser.getId(), orderId);
                 break;
             default:
-                log.error("Invalid user role: {}", userRole);
+                log.error("Invalid user role: {}", currentUser.getRole());
                 throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
         }
         
@@ -201,14 +204,13 @@ public class OrderServiceImpl implements IOrderService {
         
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
-            log.error("Order not found: {}", orderId);
-            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND);
+            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND, "id: "+orderId);
         }
         
         String userRole = currentUser.getRole();
         
         // 权限验证
-        if ("MERCHANT".equals(userRole)) {
+        if (UserRole.MERCHANT.getCode().equals(userRole)) {
             if (order.getBagId() != null) {
                 Result<MagicBagDto> bagResult = productClient.getMagicBagById(order.getBagId());
                 if (!isResultSuccess(bagResult) || bagResult.getData() == null) {
@@ -221,7 +223,7 @@ public class OrderServiceImpl implements IOrderService {
                     throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
                 }
             }
-        } else if (!"SUPER_ADMIN".equals(userRole) && !"ADMIN".equals(userRole)) {
+        } else if (!UserRole.SUPER_ADMIN.getCode().equals(userRole) && !UserRole.ADMIN.getCode().equals(userRole)) {
             log.error("User {} with role {} attempted to update order status", 
                     currentUser.getId(), userRole);
             throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
@@ -243,8 +245,7 @@ public class OrderServiceImpl implements IOrderService {
         
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
-            log.error("Order not found: {}", orderId);
-            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND);
+            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND, "id: "+orderId);
         }
         
         doUpdateOrderStatus(order, newStatus);
@@ -258,18 +259,20 @@ public class OrderServiceImpl implements IOrderService {
         
         order.setStatus(newStatus);
         order.setUpdatedAt(new Date());
-        
+
+        OrderStatus orderStatus = OrderStatus.getByCode(newStatus.toLowerCase())
+                .orElseThrow(() -> new BusinessException(ResultStatus.ACCESS_DENIED));
         // 根据状态设置相应的时间字段
-        switch (newStatus) {
-            case "paid":
+        switch (orderStatus) {
+            case PAID:
                 order.setPaidAt(new Date());
                 log.info("Order {} status updated to 'paid'", order.getId());
                 break;
-            case "completed":
+            case COMPLETED:
                 order.setCompletedAt(new Date());
                 log.info("Order {} status updated to 'completed'", order.getId());
                 break;
-            case "cancelled":
+            case CANCELLED:
                 order.setCancelledAt(new Date());
                 log.info("Order {} status updated to 'cancelled'", order.getId());
                 break;
@@ -295,38 +298,38 @@ public class OrderServiceImpl implements IOrderService {
         
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
-            log.error("Order not found: {}", orderId);
-            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND);
+            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND, "id: "+orderId);
         }
         
         String userRole = currentUser.getRole();
         
         // 权限验证
-        if ("USER".equals(userRole)) {
+        if (UserRole.USER.getCode().equals(userRole)) {
             if (!order.getUserId().equals(currentUser.getId())) {
                 log.error("User {} attempted to cancel order {} of another user", 
                         currentUser.getId(), orderId);
                 throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
             }
-        } else if (!"SUPER_ADMIN".equals(userRole) && !"ADMIN".equals(userRole)) {
+        } else if (!UserRole.SUPER_ADMIN.getCode().equals(userRole) && !UserRole.ADMIN.getCode().equals(userRole)) {
             log.error("User {} with role {} attempted to cancel order", 
                     currentUser.getId(), userRole);
             throw new BusinessException(ResultStatus.PERMISSION_UNAUTHORIZED);
         }
         
         // 检查订单状态
-        if ("completed".equals(order.getStatus())) {
+
+        if (OrderStatus.COMPLETED.getCode().equals(order.getStatus())) {
             log.error("Attempted to cancel completed order: {}", orderId);
             throw new BusinessException(ResultStatus.ORDER_CANNOT_CANCEL);
         }
-        if ("cancelled".equals(order.getStatus())) {
+        if (OrderStatus.CANCELLED.getCode().equals(order.getStatus())) {
             log.warn("Order already cancelled: {}", orderId);
             throw new BusinessException(ResultStatus.ORDER_ALREADY_CANCELLED);
         }
         
         // 取消订单
         String oldStatus = order.getStatus();
-        order.setStatus("cancelled");
+        order.setStatus(OrderStatus.CANCELLED.getCode());
         order.setCancelledAt(new Date());
         order.setUpdatedAt(new Date());
         
@@ -347,8 +350,7 @@ public class OrderServiceImpl implements IOrderService {
         
         Order order = orderMapper.selectById(orderId);
         if (order == null) {
-            log.error("Order not found: {}", orderId);
-            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND);
+            throw new BusinessException(ResultStatus.ORDER_NOT_FOUND,"id: "+orderId);
         }
         
         // 只有商家可以核销订单
@@ -412,17 +414,19 @@ public class OrderServiceImpl implements IOrderService {
         log.info("Fetching order stats: userId={}, role={}", currentUser.getId(), userRole);
         
         OrderStatsDto stats;
-        switch (userRole) {
-            case "SUPER_ADMIN":
-            case "ADMIN":
+        UserRole role = UserRole.getByCode(userRole)
+                .orElseThrow(() -> new BusinessException(ResultStatus.ACCESS_DENIED));
+
+        switch (role) {
+            case SUPER_ADMIN, ADMIN:
                 stats = orderMapper.findAllOrderStats();
                 log.info("Admin fetched all order stats");
                 break;
-            case "MERCHANT":
+            case MERCHANT:
                 stats = orderMapper.findOrderStatsByMerchantId(currentUser.getId());
                 log.info("Merchant {} fetched order stats", currentUser.getId());
                 break;
-            case "USER":
+            case USER:
                 stats = orderMapper.findOrderStatsByUserId(currentUser.getId());
                 log.info("User {} fetched order stats", currentUser.getId());
                 break;
@@ -489,24 +493,19 @@ public class OrderServiceImpl implements IOrderService {
                         
                         // 查询商家信息（通过 Merchant 服务）
                         if (bag.getMerchantId() != null) {
-                            try {
-                                Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
-                                if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
-                                    MerchantDto merchant = merchantResult.getData();
-                                    OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
-                                    merchantInfo.setId(merchant.getId());
-                                    merchantInfo.setName(merchant.getName());
-                                    merchantInfo.setPhone(merchant.getPhone());
-                                    merchantInfo.setAddress(merchant.getAddress());
-                                    response.setMerchant(merchantInfo);
-                                    log.debug("Merchant info added to cart order detail: merchantId={}", merchant.getId());
-                                } else {
-                                    log.warn("Failed to get merchant info for cart order {}: merchantId={}", 
-                                            order.getId(), bag.getMerchantId());
-                                }
-                            } catch (Exception e) {
-                                log.error("Error fetching merchant info for cart order {}: {}", 
-                                        order.getId(), e.getMessage());
+                            Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
+                            if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
+                                MerchantDto merchant = merchantResult.getData();
+                                OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
+                                merchantInfo.setId(merchant.getId());
+                                merchantInfo.setName(merchant.getName());
+                                merchantInfo.setPhone(merchant.getPhone());
+                                merchantInfo.setAddress(merchant.getAddress());
+                                response.setMerchant(merchantInfo);
+                                log.debug("Merchant info added to cart order detail: merchantId={}", merchant.getId());
+                            } else {
+                                log.warn("Failed to get merchant info for cart order {}: merchantId={}",
+                                        order.getId(), bag.getMerchantId());
                             }
                         }
                     } else {
@@ -535,24 +534,16 @@ public class OrderServiceImpl implements IOrderService {
                         
                         // 查询商家信息（通过 Merchant 服务）
                         if (bag.getMerchantId() != null) {
-                            try {
-                                Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
-                                if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
-                                    MerchantDto merchant = merchantResult.getData();
-                                    OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
-                                    merchantInfo.setId(merchant.getId());
-                                    merchantInfo.setName(merchant.getName());
-                                    merchantInfo.setPhone(merchant.getPhone());
-                                    merchantInfo.setAddress(merchant.getAddress());
-                                    response.setMerchant(merchantInfo);
-                                    log.debug("Merchant info added to order detail: merchantId={}", merchant.getId());
-                                } else {
-                                    log.warn("Failed to get merchant info for order {}: merchantId={}", 
-                                            order.getId(), bag.getMerchantId());
-                                }
-                            } catch (Exception e) {
-                                log.error("Error fetching merchant info for order {}: {}", 
-                                        order.getId(), e.getMessage());
+                            Result<MerchantDto> merchantResult = merchantClient.getMerchantById(bag.getMerchantId());
+                            if (isResultSuccess(merchantResult) && merchantResult.getData() != null) {
+                                MerchantDto merchant = merchantResult.getData();
+                                OrderDetailResponse.MerchantInfo merchantInfo = new OrderDetailResponse.MerchantInfo();
+                                merchantInfo.setId(merchant.getId());
+                                merchantInfo.setName(merchant.getName());
+                                merchantInfo.setPhone(merchant.getPhone());
+                                merchantInfo.setAddress(merchant.getAddress());
+                                response.setMerchant(merchantInfo);
+                                log.debug("Merchant info added to order detail: merchantId={}", merchant.getId());
                             }
                         }
                     } else {
@@ -570,7 +561,7 @@ public class OrderServiceImpl implements IOrderService {
             List<OrderVerification> verifications = orderVerificationMapper.findByOrderId(order.getId());
             List<OrderVerificationDto> verificationDtos = verifications.stream()
                     .map(this::convertToVerificationDto)
-                    .collect(Collectors.toList());
+                    .toList();
             response.setVerifications(verificationDtos);
             log.debug("Added {} verification records to order detail", verificationDtos.size());
         } catch (Exception e) {
@@ -632,7 +623,7 @@ public class OrderServiceImpl implements IOrderService {
         
         // 设置 bag_id 和自提时间（使用第一个商品的信息）
         if (!cart.getItems().isEmpty()) {
-            CartItemDto firstItem = cart.getItems().get(0);
+            CartItemDto firstItem = cart.getItems().getFirst();
             order.setBagId(firstItem.getMagicBagId());
             log.info("Set bag_id for cart order: {}", firstItem.getMagicBagId());
             
@@ -693,7 +684,7 @@ public class OrderServiceImpl implements IOrderService {
      * 生成自提码
      */
     private String generatePickupCode() {
-        return String.valueOf((int) (Math.random() * 9000) + 1000);
+        return String.format("%04d", (random.nextInt(10000)));
     }
     
     /**
@@ -708,7 +699,7 @@ public class OrderServiceImpl implements IOrderService {
             List<OrderItem> orderItems = orderItemMapper.findByOrderId(order.getId());
             List<OrderItemDto> itemDtos = orderItems.stream()
                     .map(this::convertToOrderItemDto)
-                    .collect(Collectors.toList());
+                    .toList();
             dto.setOrderItems(itemDtos);
             
             // 设置主要商品信息（用于显示）

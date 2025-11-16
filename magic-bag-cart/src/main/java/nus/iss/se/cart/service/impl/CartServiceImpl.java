@@ -1,5 +1,6 @@
 package nus.iss.se.cart.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,6 +23,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.NoSuchElementException;
+import java.util.Objects;
 import java.util.function.Function;
 import java.util.stream.Collectors;
 
@@ -52,8 +54,8 @@ public class CartServiceImpl implements ICartService {
         Cart cart = cartMapper.findByUserId(userId);
         if (cart != null) {
             // ✅ 修复：使用普通 QueryWrapper
-            QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("cart_id", cart.getCartId());
+            LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(CartItem::getCartId, cart.getCartId());
             List<CartItem> items = cartItemMapper.selectList(queryWrapper);
             cart.setCartItems(items);
         }
@@ -84,9 +86,9 @@ public class CartServiceImpl implements ICartService {
         }
         
         // ✅ 修复：使用普通 QueryWrapper，明确指定数据库列名
-        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magic_bag_id", magicBagId);
+        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CartItem::getCartId, cart.getCartId())
+                .eq(CartItem::getMagicBagId, magicBagId);
         CartItem existing = cartItemMapper.selectOne(queryWrapper);
         
         log.info("Existing cart item check: cartId={}, magicBagId={}, found={}", 
@@ -139,10 +141,10 @@ public class CartServiceImpl implements ICartService {
             log.error("Cart not found for user: {}", userId);
             throw new NoSuchElementException(ResultStatus.CART_NOT_FOUND.getMessage());
         }
-        
-        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magic_bag_id", magicBagId);
+
+        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CartItem::getCartId, cart.getCartId())
+                .eq(CartItem::getMagicBagId, magicBagId);
         CartItem item = cartItemMapper.selectOne(queryWrapper);
         
         if (item == null) {
@@ -209,9 +211,8 @@ public class CartServiceImpl implements ICartService {
         }
         
         // 使用 QueryWrapper 查询购物车项
-        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("cart_id", cart.getCartId())
-                   .orderByDesc("added_at");
+        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CartItem::getCartId, cart.getCartId()).orderByDesc(CartItem::getAddedAt);
         List<CartItem> items = cartItemMapper.selectList(queryWrapper);
         
         if (items.isEmpty()) {
@@ -223,7 +224,7 @@ public class CartServiceImpl implements ICartService {
         List<Integer> bagIds = items.stream()
                 .map(CartItem::getMagicBagId)
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
         
         log.info("Fetching product info for {} items", bagIds.size());
         Result<List<MagicBagDto>> result = productClient.getBatchMagicBags(bagIds);
@@ -252,7 +253,7 @@ public class CartServiceImpl implements ICartService {
                 item.getQuantity(),
                 subtotal
             );
-        }).filter(dto -> dto != null).collect(Collectors.toList());
+        }).filter(Objects::nonNull).toList();
         
         log.info("Retrieved {} cart items for user: {}", cartItemDtos.size(), userId);
         return cartItemDtos;
@@ -286,8 +287,8 @@ public class CartServiceImpl implements ICartService {
             return 0.0;
         }
         
-        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("cart_id", cart.getCartId());
+        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(CartItem::getCartId, cart.getCartId());
         List<CartItem> items = cartItemMapper.selectList(queryWrapper);
         
         if (items.isEmpty()) {
@@ -299,7 +300,7 @@ public class CartServiceImpl implements ICartService {
         List<Integer> bagIds = items.stream()
                 .map(CartItem::getMagicBagId)
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
         
         Result<List<MagicBagDto>> result = productClient.getBatchMagicBags(bagIds);
         
@@ -407,7 +408,7 @@ public class CartServiceImpl implements ICartService {
                 item.getQuantity(),
                 subtotal
             );
-        }).filter(dto -> dto != null).collect(Collectors.toList());
+        }).filter(Objects::nonNull).toList();
         
         double total = items.stream().mapToDouble(CartItemDto::getSubtotal).sum();
         
