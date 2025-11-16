@@ -134,11 +134,8 @@ public class OrderServiceImplTest {
     }
 
     private CartDto dummyCart() {
-        CartItemDto item = new CartItemDto();
-        item.setMagicBagId(1);
-        item.setQuantity(2);
-        item.setPrice(25.0);
-        item.setSubtotal(50.0);
+        // CartItemDto(itemId, magicBagId, bagName, price, quantity, subtotal)
+        CartItemDto item = new CartItemDto(1, 1, "Test Bag", 25.0, 2, 50.0);
         
         return new CartDto(1, 3, List.of(item), 50.0);
     }
@@ -340,7 +337,11 @@ public class OrderServiceImplTest {
     void testGetOrderStats_Admin() {
         OrderStatsDto stats = new OrderStatsDto();
         stats.setTotalOrders(100L);
-        stats.setTotalRevenue(BigDecimal.valueOf(5000.0));
+        stats.setTotalAmount(BigDecimal.valueOf(5000.0));
+        stats.setPendingOrders(10L);
+        stats.setPaidOrders(50L);
+        stats.setCompletedOrders(30L);
+        stats.setCancelledOrders(10L);
 
         when(orderMapper.findAllOrderStats()).thenReturn(stats);
 
@@ -348,6 +349,7 @@ public class OrderServiceImplTest {
 
         assertNotNull(result);
         assertEquals(100L, result.getTotalOrders());
+        assertEquals(BigDecimal.valueOf(5000.0), result.getTotalAmount());
         verify(orderMapper, times(1)).findAllOrderStats();
     }
 
