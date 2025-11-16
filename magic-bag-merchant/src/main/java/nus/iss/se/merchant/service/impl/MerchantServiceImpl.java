@@ -1,20 +1,29 @@
 package nus.iss.se.merchant.service.impl;
 
+import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import nus.iss.se.common.Result;
 import nus.iss.se.common.constant.ResultStatus;
 import nus.iss.se.common.exception.BusinessException;
 import nus.iss.se.kafka.event.EventEnvelope;
 import nus.iss.se.kafka.publisher.KafkaEventPublisher;
+import nus.iss.se.merchant.api.UserClient;
 import nus.iss.se.merchant.common.UserContextHolder;
+import nus.iss.se.merchant.constant.TaskStatus;
+import nus.iss.se.merchant.constant.UserRole;
 import nus.iss.se.merchant.dto.MerchantDto;
 import nus.iss.se.merchant.dto.MerchantUpdateDto;
+import nus.iss.se.merchant.dto.UpdateRoleQo;
 import nus.iss.se.merchant.entity.Merchant;
 import nus.iss.se.merchant.kafka.EventTopicType;
+import nus.iss.se.merchant.kafka.event.MerchantProcessedEvent;
 import nus.iss.se.merchant.kafka.event.MerchantRegisterEvent;
 import nus.iss.se.merchant.mapper.MerchantMapper;
 import nus.iss.se.merchant.service.IMerchantService;
@@ -25,12 +34,14 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.Date;
 import java.util.List;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class MerchantServiceImpl extends ServiceImpl<MerchantMapper, Merchant> implements IMerchantService{
     private final ObjectMapper objectMapper;
     private   final KafkaEventPublisher eventPublisher;
     private final UserContextHolder userContextHolder;
+    private final UserClient userClient;
 
     @Override
     public List<MerchantDto> getAllMerchants() {
@@ -100,6 +111,49 @@ public class MerchantServiceImpl extends ServiceImpl<MerchantMapper, Merchant> i
             eventPublisher.publish(eventEnvelope);
         } catch (JsonProcessingException e) {
             throw new RuntimeException(e);
+        }
+    }
+
+    public void handleRegisterResult(MerchantProcessedEvent event) {
+        log.info("处理商家{}注册结果：{}", event.getUserId(), event);
+        try {
+            // 1. 根据userId查找商家信息
+            Merchant merchant = baseMapper.findByUserId(event.getUserId().intValue());
+
+            if (merchant == null) {
+                log.warn("未找到用户ID为{}的商家记录", event.getUserId());
+                return;
+            }
+
+            // 2. 根据审批结果更新商家状态
+            if (TaskStatus.APPROVED.getCode().equals(event.getStatus())) {
+                // 注册通过，更新商家状态为已通过
+                merchant.setStatus("approved");
+                merchant.setUpdatedAt(new Date());
+                merchant.setApprovedAt(new Date());
+                updateById(merchant);
+
+                // 3. 更新用户角色为 MERCHANT
+                Result<Void> result = userClient.updateUserRole(event.getUserId(), new UpdateRoleQo(UserRole.CUSTOMER.getCode(), UserRole.MERCHANT.getCode()));
+                if (ResultStatus.SUCCESS.getCode() == result.getCode()) {
+                    log.info("用户角色已更新为商家，用户ID: {}", event.getUserId());
+                }else {
+                    log.warn("用户角色更新为商家失败: {}", result.getMessage());
+                }
+
+            } else if (TaskStatus.REJECTED.getCode().equals(event.getStatus())) {
+                // 注册拒绝，更新商家状态为已拒绝
+                merchant.setStatus("rejected");
+                merchant.setUpdatedAt(new Date());
+                updateById(merchant);
+
+                log.info("商家注册申请已拒绝，用户ID: {}, 商家ID: {}", event.getUserId(), merchant.getId());
+            } else {
+                log.warn("未知的审批状态: {}", event.getStatus());
+            }
+
+        } catch (Exception e) {
+            log.error("处理商家注册结果时发生异常，用户ID: {}, 异常信息: {}", event.getUserId(), e.getMessage(), e);
         }
     }
 

@@ -418,7 +418,7 @@ jobs:
       - name: ⏳ Wait for Service to Be Ready
         run: |
           echo "⏳ Waiting 30s for services to start..."
-          sleep 30
+          sleep 300
           echo "📡 Testing connectivity to ${{ env.TARGET_URL }}"
           curl -f --retry 5 --retry-delay 5 --max-time 10 ${{ env.TARGET_URL }}/actuator/health || exit 1
 
@@ -446,3 +446,49 @@ jobs:
           else
             echo "✅ No High/Critical issues found."
           fi
+
+  performance-test:
+    name: 🚀 JMeter Performance Test
+    runs-on: ubuntu-latest
+    needs: build-and-deploy
+    if: ${{ needs.detect-changes.outputs.has_changes == 'true' }}
+    steps:
+      - name: 📥 Checkout Code
+        uses: actions/checkout@v4
+
+      - name: ⏳ Wait for Service to Be Ready
+        run: |
+          echo "⏳ Waiting 60s for services to stabilize..."
+          sleep 60
+          echo "📡 Testing connectivity to ${{ env.TARGET_URL }}"
+          curl -f --retry 10 --retry-delay 5 --max-time 10 ${{ env.TARGET_URL }}/actuator/health || exit 1
+
+      - name: 🧪 Run JMeter Test
+        run: |
+          mkdir -p jmeter-report
+          docker run --rm \
+            -v "${PWD}/jmeter:/jmeter" \
+            -v "${PWD}/jmeter-report:/report" \
+            justb4/jmeter:5.6.2 \
+            -n -t /jmeter/magic-bag.jmx \
+            -Jhost=${{ secrets.EC2_HOST }} \
+            -Jport=10016 \
+            -l /report/magic-bag-results.jtl \
+            -e -o /report/dashboard
+
+      - name: 📤 Upload JMeter Report
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: jmeter-report-${{ github.run_id }}
+          path: jmeter-report/dashboard/
+          retention-days: 7
+
+      # （可选）如果希望性能不达标就失败，可添加断言检查
+      # - name: ❌ Fail if Error Rate > 1%
+      #   run: |
+      #     ERROR_RATE=$(grep -o 'errorRate":[0-9.]*' jmeter-report/dashboard/statistics.json | head -1 | cut -d: -f2)
+      #     if (( $(echo "$ERROR_RATE > 1.0" | bc -l) )); then
+      #       echo "💥 Error rate too high: $ERROR_RATE%"
+      #       exit 1
+      #     fi

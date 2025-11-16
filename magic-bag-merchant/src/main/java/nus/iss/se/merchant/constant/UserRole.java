@@ -1,4 +1,4 @@
-package nus.iss.se.user.common;
+package nus.iss.se.merchant.constant;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;

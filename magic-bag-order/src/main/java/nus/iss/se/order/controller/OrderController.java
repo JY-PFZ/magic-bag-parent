@@ -30,7 +30,6 @@ public class OrderController {
      * 获取订单列表 - 根据角色自动过滤
      */
     @GetMapping
-//    @PreAuthorize("hasAnyRole('SUPER_ADMIN', 'ADMIN', 'MERCHANT', 'USER', 'CUSTOMER')")
     @Operation(summary = "获取订单列表", description = "根据用户角色自动过滤订单数据")
     public Result<IPage<OrderDto>> getOrders(
             @RequestParam(defaultValue = "1") int pageNum,

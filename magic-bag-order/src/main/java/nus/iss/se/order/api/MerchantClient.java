@@ -18,6 +18,6 @@ public interface MerchantClient {
      * @param id 商户ID
      * @return 商户信息
      */
-    @GetMapping("/merchant/merchants/{id}")
+    @GetMapping("/merchant/{id}")
     Result<MerchantDto> getMerchantById(@PathVariable("id") Integer id);
 }

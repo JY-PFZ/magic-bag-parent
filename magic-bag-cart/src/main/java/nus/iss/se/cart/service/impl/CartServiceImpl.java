@@ -52,11 +52,11 @@ public class CartServiceImpl implements ICartService {
     public CartDto getActiveCart(Integer userId) {
         Cart cart = cartMapper.findByUserId(userId);
         if (cart != null) {
-            // 使用 QueryWrapper 查询购物车项
-            QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-            queryWrapper.eq("cart_id", cart.getCartId())
-                       .orderByDesc("added_at");
-            cart.setCartItems(cartItemMapper.selectList(queryWrapper));
+            // 使用 QueryWrapper 安全地查询
+            LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
+            queryWrapper.eq(CartItem::getCartId, cart.getCartId());
+            List<CartItem> items = cartItemMapper.selectList(queryWrapper);
+            cart.setCartItems(items);
         }
         return convertToCartDto(cart);
     }
@@ -339,7 +339,7 @@ public class CartServiceImpl implements ICartService {
                 item.getQuantity(),
                 subtotal
             );
-        }).collect(Collectors.toList());
+        }).toList();
         
         log.info("Retrieved {} cart items for magicBagId: {}", cartItemDtos.size(), magicBagId);
         return cartItemDtos;
@@ -362,7 +362,7 @@ public class CartServiceImpl implements ICartService {
         List<Integer> bagIds = cartItems.stream()
                 .map(CartItem::getMagicBagId)
                 .distinct()
-                .collect(Collectors.toList());
+                .toList();
         
         Result<List<MagicBagDto>> result = productClient.getBatchMagicBags(bagIds);
         if (!isResultSuccess(result) || result.getData() == null) {

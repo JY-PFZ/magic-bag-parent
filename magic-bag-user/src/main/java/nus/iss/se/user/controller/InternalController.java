@@ -1,16 +1,14 @@
 package nus.iss.se.user.controller;
 
+import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import nus.iss.se.common.Result;
 import nus.iss.se.common.cache.UserCacheService;
+import nus.iss.se.user.dto.UpdateRoleQo;
 import nus.iss.se.user.entity.User;
 import nus.iss.se.user.service.IUserService;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PathVariable;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 
 @RestController
@@ -34,6 +32,17 @@ public class InternalController {
         log.info("Auth service check user: {} - {}", username != null ? username.replaceAll("[\\r\\n]", "") : "null", user);
 
         return Result.success(user);
+    }
+
+    @PostMapping("/{userId}/roles")
+    public Result<Void> updateUserRole(@PathVariable("userId") Long userId, @RequestBody UpdateRoleQo qo){
+        LambdaUpdateWrapper<User> updateWrapper = new LambdaUpdateWrapper<>();
+        updateWrapper.eq(User::getId, userId)
+                .eq(User::getRole,qo.getOriRole())
+                .set(User::getRole,qo.getExpectRole());
+
+        userService.update(updateWrapper);
+        return Result.success();
     }
 
     @PostMapping("/evict/{username}")
