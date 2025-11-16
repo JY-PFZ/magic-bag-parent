@@ -1,6 +1,5 @@
 package nus.iss.se.cart.service.impl;
 
-import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.query.QueryWrapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,7 +26,7 @@ import java.util.function.Function;
 import java.util.stream.Collectors;
 
 /**
- * 购物车服务实现类 (改进版 - 使用 MyBatis-Plus)
+ * 购物车服务实现类 (修复版 - 统一使用 QueryWrapper)
  */
 @Slf4j
 @Service
@@ -52,9 +51,9 @@ public class CartServiceImpl implements ICartService {
     public CartDto getActiveCart(Integer userId) {
         Cart cart = cartMapper.findByUserId(userId);
         if (cart != null) {
-            // 使用 QueryWrapper 安全地查询
-            LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
-            queryWrapper.eq(CartItem::getCartId, cart.getCartId());
+            // ✅ 修复：使用普通 QueryWrapper
+            QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
+            queryWrapper.eq("cart_id", cart.getCartId());
             List<CartItem> items = cartItemMapper.selectList(queryWrapper);
             cart.setCartItems(items);
         }
@@ -64,9 +63,12 @@ public class CartServiceImpl implements ICartService {
     @Override
     @Transactional(rollbackFor = Exception.class)
     public CartDto addItemToCart(Integer userId, Integer magicBagId, int quantity) {
+        log.info("Adding item to cart: userId={}, magicBagId={}, quantity={}", userId, magicBagId, quantity);
+        
         // 验证产品是否存在
         Result<MagicBagDto> bagResult = productClient.getMagicBagById(magicBagId);
         if (!isResultSuccess(bagResult) || bagResult.getData() == null) {
+            log.error("Product not found: {}", magicBagId);
             throw new BusinessException(ResultStatus.PRODUCT_NOT_FOUND,"detail: "+magicBagId);
         }
         
@@ -75,33 +77,50 @@ public class CartServiceImpl implements ICartService {
         if (cart == null) {
             cart = new Cart();
             cart.setUserId(userId);
+            cart.setCreatedAt(LocalDateTime.now());
+            cart.setUpdatedAt(LocalDateTime.now());
             cartMapper.insertCart(cart);
-            log.info("Created new cart for user: {}", userId);
+            log.info("Created new cart for user: {}, cartId={}", userId, cart.getCartId());
         }
         
-        // 使用 QueryWrapper 检查购物车中是否已存在该商品
-        LambdaQueryWrapper<CartItem> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(CartItem::getCartId, cart.getCartId())
-                .eq(CartItem::getMagicBagId, magicBagId);
+        // ✅ 修复：使用普通 QueryWrapper，明确指定数据库列名
+        QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("cart_id", cart.getCartId())
+                   .eq("magic_bag_id", magicBagId);
         CartItem existing = cartItemMapper.selectOne(queryWrapper);
+        
+        log.info("Existing cart item check: cartId={}, magicBagId={}, found={}", 
+                cart.getCartId(), magicBagId, existing != null);
 
         if (existing != null) {
             // 更新数量 - 使用 updateById
             existing.setQuantity(existing.getQuantity() + quantity);
             existing.setAddedAt(LocalDateTime.now());
-            cartItemMapper.updateById(existing);
-            log.info("Updated cart item quantity: cartId={}, magicBagId={}, newQuantity={}", 
-                    cart.getCartId(), magicBagId, existing.getQuantity());
+            int result = cartItemMapper.updateById(existing);
+            log.info("Updated cart item quantity: cartId={}, magicBagId={}, newQuantity={}, result={}", 
+                    cart.getCartId(), magicBagId, existing.getQuantity(), result);
         } else {
             // 添加新商品 - 使用 insert
             CartItem item = new CartItem();
             item.setCartId(cart.getCartId());
             item.setMagicBagId(magicBagId);
             item.setQuantity(quantity);
-            cartItemMapper.insert(item);
-            log.info("Added new item to cart: cartId={}, magicBagId={}, quantity={}", 
-                    cart.getCartId(), magicBagId, quantity);
+            item.setAddedAt(LocalDateTime.now());
+            
+            int result = cartItemMapper.insert(item);
+            log.info("Added new item to cart: cartId={}, magicBagId={}, quantity={}, result={}, generatedId={}", 
+                    cart.getCartId(), magicBagId, quantity, result, item.getCartItemId());
+            
+            // 验证插入是否成功
+            if (result <= 0) {
+                log.error("Failed to insert cart item! Insert result: {}", result);
+                throw new RuntimeException("Failed to insert cart item");
+            }
         }
+        
+        // 更新购物车时间
+        cart.setUpdatedAt(LocalDateTime.now());
+        cartMapper.updateCart(cart);
         
         // 重新加载购物车项
         return getActiveCart(userId);
@@ -123,7 +142,7 @@ public class CartServiceImpl implements ICartService {
         
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
+                   .eq("magic_bag_id", magicBagId);
         CartItem item = cartItemMapper.selectOne(queryWrapper);
         
         if (item == null) {
@@ -162,7 +181,7 @@ public class CartServiceImpl implements ICartService {
         
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
         queryWrapper.eq("cart_id", cart.getCartId())
-                   .eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
+                   .eq("magic_bag_id", magicBagId);
         CartItem item = cartItemMapper.selectOne(queryWrapper);
         
         if (item != null) {
@@ -312,7 +331,7 @@ public class CartServiceImpl implements ICartService {
     public List<CartItemDto> getCartItemsByMagicBagId(Integer magicBagId) {
         // 使用 QueryWrapper 查询
         QueryWrapper<CartItem> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("magic_bag_id", magicBagId);  // ✓ 修复：改为 magic_bag_id
+        queryWrapper.eq("magic_bag_id", magicBagId);
         List<CartItem> items = cartItemMapper.selectList(queryWrapper);
         
         if (items.isEmpty()) {
