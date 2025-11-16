@@ -219,7 +219,7 @@ jobs:
             -s ~/.m2/settings.xml \
             -Dsonar.host.url=${{ secrets.SONAR_HOST_URL }} \
             -Dsonar.organization=${{ secrets.SONAR_ORGANIZATION }} \
-            -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
+             -Dsonar.token=${{ secrets.SONAR_TOKEN }} \
             -Dsonar.projectKey=magic-bag-parent \
             -Dsonar.branch.name=${{ github.ref_name }}
             || echo "⚠️ Sonar scan completed but failed to validate default branch. Analysis still uploaded."
