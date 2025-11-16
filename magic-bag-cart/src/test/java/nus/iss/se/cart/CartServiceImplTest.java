@@ -9,7 +9,6 @@ import nus.iss.se.cart.mapper.CartItemMapper;
 import nus.iss.se.cart.mapper.CartMapper;
 import nus.iss.se.cart.service.impl.CartServiceImpl;
 import nus.iss.se.common.Result;
-import nus.iss.se.common.constant.ResultStatus;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -54,12 +53,9 @@ public class CartServiceImplTest {
      *  ------------------------- */
     @Test
     void testCreateCart() {
-        Cart cart = new Cart();
-        cart.setCartId(100);
-        cart.setUserId(1);
-
         doAnswer(invocation -> {
-            ((Cart) invocation.getArgument(0)).setCartId(100);
+            Cart c = invocation.getArgument(0);
+            c.setCartId(100);
             return 1;
         }).when(cartMapper).insertCart(any(Cart.class));
 
@@ -77,23 +73,43 @@ public class CartServiceImplTest {
     void testAddItemToCart_NewItem() {
         MagicBagDto bag = dummyBag();
 
-        when(productClient.getMagicBagById(1))
-                .thenReturn(Result.success(bag));
+        when(productClient.getMagicBagById(1)).thenReturn(Result.success(bag));
 
         Cart cart = new Cart();
         cart.setCartId(10);
         cart.setUserId(1);
         when(cartMapper.findByUserId(1)).thenReturn(cart);
 
+        // 第一次查询返回 null（不存在）
         when(cartItemMapper.selectOne(any())).thenReturn(null);
 
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(bag)));
+        // Mock insert 返回成功
+        doAnswer(invocation -> {
+            CartItem item = invocation.getArgument(0);
+            item.setCartItemId(999); // 设置自动生成的ID
+            return 1; // 返回影响行数
+        }).when(cartItemMapper).insert(any(CartItem.class));
+
+        // Mock updateCart
+        when(cartMapper.updateCart(any(Cart.class))).thenReturn(1);
+
+        // Mock getActiveCart 返回的 selectList
+        CartItem savedItem = new CartItem();
+        savedItem.setCartItemId(999);
+        savedItem.setCartId(10);
+        savedItem.setMagicBagId(1);
+        savedItem.setQuantity(2);
+        savedItem.setAddedAt(LocalDateTime.now());
+        
+        when(cartItemMapper.selectList(any())).thenReturn(List.of(savedItem));
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of(bag)));
 
         CartDto result = cartService.addItemToCart(1, 1, 2);
 
         verify(cartItemMapper, times(1)).insert(any());
+        assertNotNull(result);
         assertEquals(10, result.getCartId());
+        assertEquals(1, result.getItems().size());
         assertEquals(1, result.getItems().get(0).getMagicBagId());
         assertEquals(2, result.getItems().get(0).getQuantity());
     }
@@ -105,28 +121,37 @@ public class CartServiceImplTest {
     void testAddItemToCart_UpdateExisting() {
         MagicBagDto bag = dummyBag();
 
-        when(productClient.getMagicBagById(1))
-                .thenReturn(Result.success(bag));
+        when(productClient.getMagicBagById(1)).thenReturn(Result.success(bag));
 
         Cart cart = new Cart();
         cart.setCartId(10);
         cart.setUserId(1);
         when(cartMapper.findByUserId(1)).thenReturn(cart);
 
-        CartItem exist = new CartItem();
-        exist.setCartItemId(999);
-        exist.setCartId(10);
-        exist.setMagicBagId(1);
-        exist.setQuantity(3);
+        CartItem existing = new CartItem();
+        existing.setCartItemId(999);
+        existing.setCartId(10);
+        existing.setMagicBagId(1);
+        existing.setQuantity(3);
 
-        when(cartItemMapper.selectOne(any())).thenReturn(exist);
+        when(cartItemMapper.selectOne(any())).thenReturn(existing);
+        when(cartItemMapper.updateById(any())).thenReturn(1);
+        when(cartMapper.updateCart(any(Cart.class))).thenReturn(1);
 
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(bag)));
+        // Mock getActiveCart 返回更新后的 item
+        CartItem updatedItem = new CartItem();
+        updatedItem.setCartItemId(999);
+        updatedItem.setCartId(10);
+        updatedItem.setMagicBagId(1);
+        updatedItem.setQuantity(5); // 3 + 2
+        
+        when(cartItemMapper.selectList(any())).thenReturn(List.of(updatedItem));
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of(bag)));
 
         CartDto result = cartService.addItemToCart(1, 1, 2);
 
         verify(cartItemMapper, times(1)).updateById(any());
+        assertNotNull(result);
         assertEquals(5, result.getItems().get(0).getQuantity());
     }
 
@@ -147,13 +172,23 @@ public class CartServiceImplTest {
         item.setQuantity(3);
 
         when(cartItemMapper.selectOne(any())).thenReturn(item);
+        when(cartItemMapper.updateById(any())).thenReturn(1);
+        when(cartMapper.updateCart(any(Cart.class))).thenReturn(1);
 
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(dummyBag())));
+        // Mock getActiveCart 返回更新后的 item
+        CartItem updatedItem = new CartItem();
+        updatedItem.setCartItemId(500);
+        updatedItem.setCartId(10);
+        updatedItem.setMagicBagId(1);
+        updatedItem.setQuantity(10);
+        
+        when(cartItemMapper.selectList(any())).thenReturn(List.of(updatedItem));
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of(dummyBag())));
 
         CartDto result = cartService.updateItemQuantityInCart(1, 1, 10);
 
         verify(cartItemMapper, times(1)).updateById(any());
+        assertNotNull(result);
         assertEquals(10, result.getItems().get(0).getQuantity());
     }
 
@@ -169,14 +204,21 @@ public class CartServiceImplTest {
 
         CartItem item = new CartItem();
         item.setCartItemId(500);
+        item.setMagicBagId(1);
+        
         when(cartItemMapper.selectOne(any())).thenReturn(item);
+        when(cartItemMapper.deleteById(500)).thenReturn(1);
+        when(cartMapper.updateCart(any(Cart.class))).thenReturn(1);
 
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(dummyBag())));
+        // Mock getActiveCart 返回空列表
+        when(cartItemMapper.selectList(any())).thenReturn(List.of());
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of()));
 
         CartDto result = cartService.removeItemFromCart(1, 1);
 
         verify(cartItemMapper, times(1)).deleteById(500);
+        assertNotNull(result);
+        assertTrue(result.getItems().isEmpty());
     }
 
     /** -------------------------
@@ -193,12 +235,10 @@ public class CartServiceImplTest {
         item.setMagicBagId(1);
         item.setQuantity(2);
 
-        when(cartItemMapper.selectList(any()))
-                .thenReturn(List.of(item));
+        when(cartItemMapper.selectList(any())).thenReturn(List.of(item));
 
         MagicBagDto bag = dummyBag();
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(bag)));
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of(bag)));
 
         var items = cartService.getCartItems(1);
 
@@ -213,13 +253,19 @@ public class CartServiceImplTest {
     void testClearCart() {
         Cart cart = new Cart();
         cart.setCartId(10);
+        cart.setUserId(1);
         when(cartMapper.findByUserId(1)).thenReturn(cart);
 
         when(cartItemMapper.delete(any())).thenReturn(3);
+        when(cartMapper.updateCart(any(Cart.class))).thenReturn(1);
+
+        // Mock getActiveCart - 不会被调用，clearCart 直接返回
+        cart.setCartItems(List.of());
 
         CartDto dto = cartService.clearCart(1);
 
         verify(cartItemMapper, times(1)).delete(any());
+        assertNotNull(dto);
         assertEquals(10, dto.getCartId());
     }
 
@@ -236,12 +282,10 @@ public class CartServiceImplTest {
         item.setMagicBagId(1);
         item.setQuantity(3);
 
-        when(cartItemMapper.selectList(any()))
-                .thenReturn(List.of(item));
+        when(cartItemMapper.selectList(any())).thenReturn(List.of(item));
 
         MagicBagDto bag = dummyBag();
-        when(productClient.getBatchMagicBags(any()))
-                .thenReturn(Result.success(List.of(bag)));
+        when(productClient.getBatchMagicBags(any())).thenReturn(Result.success(List.of(bag)));
 
         double total = cartService.getTotal(1);
 

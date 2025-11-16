@@ -36,6 +36,26 @@ jobs:
       - name: 📂 Identify Modules (Full/Incremental)
         id: set_output
         run: |
+          # =============== 新增：强制 main 分支全量构建 ===============
+          BRANCH_NAME="${{ github.ref_name }}"
+          if [ "$BRANCH_NAME" = "main" ]; then
+            echo "💡 Detected 'main' branch → forcing full build."
+            ALL_MODULES=()
+            while IFS= read -r file; do
+              DIR=$(dirname "$file")
+              if [ "$DIR" != "." ] && [[ "$DIR" != *"/target/"* ]]; then
+                ALL_MODULES+=("$DIR")
+              fi
+            done <<< "$(find . -name 'pom.xml' -not -path './pom.xml')"
+            UNIQUE_ALL_MODULES=($(printf "%s\n" "${ALL_MODULES[@]}" | sort -u))
+            ALL_MODULE_LIST=$(IFS=','; echo "${UNIQUE_ALL_MODULES[*]}")
+            echo "changed_modules=$ALL_MODULE_LIST" >> $GITHUB_OUTPUT
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          # ==========================================================
+
+          # 原有逻辑：非 main 分支走增量检测
           ALL_MODULES=()
           while IFS= read -r file; do
             DIR=$(dirname "$file")
@@ -79,7 +99,6 @@ jobs:
             echo "changed_modules=$MODULE_LIST" >> $GITHUB_OUTPUT
             echo "has_changes=true" >> $GITHUB_OUTPUT
           fi
-
   build-and-scan:
     name: 🧪 Build Changed & SonarQube Scan
     runs-on: ubuntu-latest
