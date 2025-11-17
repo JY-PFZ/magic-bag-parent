@@ -28,11 +28,12 @@ public class MerchantLocationService {
     private final IMerchantService merchantService;
     private final StringRedisTemplate redisTemplate;
 
-    // 初始化：将店铺数据加载到 Redis GEO（可从数据库同步）
     @PostConstruct
     public void init() {
         List<MerchantDto> merchants = merchantService.getAllMerchants();
-        merchants.forEach(item -> redisUtil.setGeo(RedisPrefix.MERCHANT_LOCATION.getCode(),new Point(item.getLongitude().doubleValue(),item.getLatitude().doubleValue()),item.getName()));
+        merchants.stream()
+                .filter(item -> item.getLongitude() != null && item.getLatitude() != null)
+                .forEach(item -> redisUtil.setGeo(RedisPrefix.MERCHANT_LOCATION.getCode(),new Point(item.getLongitude().doubleValue(),item.getLatitude().doubleValue()),item.getName()));
         log.info("Merchant location data initialized with {} stores", merchants.size());
     }
 

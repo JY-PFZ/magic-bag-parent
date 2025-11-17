@@ -1,5 +1,6 @@
 package nus.iss.se.product.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.conditions.update.LambdaUpdateWrapper;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -13,9 +14,11 @@ import nus.iss.se.product.entity.MagicBag;
 import nus.iss.se.product.enums.StorageDir;
 import nus.iss.se.product.service.FileService;
 import nus.iss.se.product.service.IMagicBagService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -56,6 +59,17 @@ public class MagicBagController {
             return Result.error("盲盒不存在");
         }
         return Result.success(magicBag);
+    }
+
+    @PostMapping("/batch-query")
+    public Result<List<MagicBagDto>> getBatchMagicBagById(@RequestBody List<Integer> ids) {
+        LambdaQueryWrapper<MagicBag> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.in(MagicBag::getId,ids);
+        List<MagicBag> list = magicBagService.list(queryWrapper);
+
+        List<MagicBagDto> result = new ArrayList<>();
+        BeanUtils.copyProperties(list,result);
+        return Result.success(result);
     }
     
     /**

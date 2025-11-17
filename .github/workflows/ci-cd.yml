@@ -398,7 +398,7 @@ jobs:
           mkdir -p zap-report
           docker run -v $PWD/zap-report:/zap/wrk:rw \
             --rm \
-            owasp/zap2docker-stable \
+            ghcr.io/zaproxy/zap-stable \
             zap-baseline.py \
             -t http://${{ secrets.EC2_HOST }}:10016 \
             -r zap-report.html
@@ -438,7 +438,7 @@ jobs:
           docker run --rm \
             -v "${PWD}/jmeter:/jmeter" \
             -v "${PWD}/jmeter-report:/report" \
-            justb4/jmeter:5.6.2 \
+            justb4/jmeter:5.5 \
             -n -t /jmeter/magic-bag.jmx \
             -Jhost=${{ secrets.EC2_HOST }} \
             -Jport=10016 \
