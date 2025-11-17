@@ -12,16 +12,16 @@ import java.util.List;
 @FeignClient(name = "magic-bag-merchant")
 public interface MerchantClient {
 
-    @GetMapping("/merchant/merchants")
+    @GetMapping("/merchant")
     Result<List<MerchantDto>> getAllMerchants();
 
-    @GetMapping("/merchant/merchants/{id}")
+    @GetMapping("/merchant/{id}")
     Result<MerchantDto> getMerchantById(@PathVariable("id") Integer id);
 
-    @PutMapping("/merchant/merchants/profile")
+    @PutMapping("/merchant/profile")
     Result<Void> updateMerchantProfile(@RequestBody MerchantUpdateDto merchantDto);
 
-    @GetMapping("/merchant/merchants/sorted-by-score")
+    @GetMapping("/merchant/sorted-by-score")
     Result<IPage<MerchantDto>> sortedByScore(@RequestParam("current") Integer current,
                                             @RequestParam("size") Integer size,
                                             @RequestParam("minScore") Integer minScore);

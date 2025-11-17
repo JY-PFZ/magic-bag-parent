@@ -88,4 +88,13 @@ public class UserController {
         userService.register(req);
         return Result.success();
     }
+
+    @GetMapping("profile/id/{id}")
+    public Result<UserDto> getProfileById(@PathVariable Integer id){
+        UserDto userDto = userService.getUserById(id);
+        if (userDto == null) {
+            return Result.error("User not found");
+        }
+        return Result.success(userDto);
+    }
 }

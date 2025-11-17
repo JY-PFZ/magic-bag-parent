@@ -11,6 +11,7 @@ import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
 
+import java.security.SecureRandom;
 import java.util.Random;
 import java.util.UUID;
 import java.util.concurrent.TimeUnit;
@@ -23,7 +24,7 @@ public class EmailService {
     private final RedisUtil redisUtil;
     private final JavaMailSender javaMailSender;
 
-    private static final Random RANDOM = new Random();
+    private static final SecureRandom RANDOM = new SecureRandom();
     private static final String ACTIVATE_API = "api/auth/activate";
 
     // 发送验证码邮件（HTML 格式）

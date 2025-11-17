@@ -1,5 +1,6 @@
 package nus.iss.se.product.entity;
 
+import com.baomidou.mybatisplus.annotation.IdType;
 import com.baomidou.mybatisplus.annotation.TableId;
 import com.baomidou.mybatisplus.annotation.TableName;
 import lombok.Data;
@@ -16,7 +17,7 @@ import java.util.Date;
 @TableName("magic_bags")
 public class MagicBag {
 
-    @TableId
+    @TableId(type = IdType.AUTO)
     private Integer id;
 
     private Integer merchantId;

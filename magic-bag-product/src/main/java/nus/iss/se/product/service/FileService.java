@@ -37,7 +37,8 @@ public class FileService {
 
         String key = dir + "/" + fileName + "." + getFileExtension(file.getOriginalFilename());
         try {
-            Path tempFile = Files.write(Files.createTempFile("upload-", ""), file.getBytes());
+            Path tempFile = Files.createTempFile("upload-", ".");
+            Files.write(tempFile, file.getBytes());
             // 上传文件
             return storageService.upload(key, tempFile);
         } catch (IOException e) {

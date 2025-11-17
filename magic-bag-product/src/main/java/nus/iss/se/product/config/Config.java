@@ -1,5 +1,6 @@
 package nus.iss.se.product.config;
 
+import jakarta.servlet.MultipartConfigElement;
 import lombok.RequiredArgsConstructor;
 import org.apache.commons.lang3.StringUtils;
 import org.springframework.context.annotation.Bean;
@@ -15,7 +16,7 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
  */
 @Configuration
 @RequiredArgsConstructor
-public class S3Config {
+public class Config {
 
     @Bean
     public S3Client s3Client(S3Properties s3Properties) {
@@ -31,5 +32,10 @@ public class S3Config {
         }
 
         return builder.build();
+    }
+
+    @Bean
+    public MultipartConfigElement multipartConfigElement() {
+        return new MultipartConfigElement("/tmp/magic-bag-uploads");
     }
 }

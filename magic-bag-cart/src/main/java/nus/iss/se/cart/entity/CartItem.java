@@ -26,7 +26,6 @@ public class CartItem {
 
     private Integer cartId;
     
-    @TableField("magic_bag_id")
     private Integer magicBagId;
 
     private int quantity;

@@ -20,4 +20,7 @@ public interface MerchantClient {
      */
     @GetMapping("/merchant/{id}")
     Result<MerchantDto> getMerchantById(@PathVariable("id") Integer id);
+
+    @GetMapping("/merchant/user/{id}")
+    Result<MerchantDto> getMerchantByUserId(@PathVariable("id") Integer id);
 }

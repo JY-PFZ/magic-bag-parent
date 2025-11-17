@@ -1,5 +1,6 @@
 package nus.iss.se.merchant.controller;
 
+import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.core.metadata.IPage;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
@@ -14,8 +15,10 @@ import nus.iss.se.merchant.common.UserContextHolder;
 import nus.iss.se.merchant.dto.MerchantDto;
 import nus.iss.se.merchant.dto.MerchantLocationDto;
 import nus.iss.se.merchant.dto.MerchantUpdateDto;
+import nus.iss.se.merchant.entity.Merchant;
 import nus.iss.se.merchant.service.IMerchantService;
 import nus.iss.se.merchant.service.MerchantLocationService;
+import org.springframework.beans.BeanUtils;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -45,6 +48,18 @@ public class MerchantController {
             return Result.error("商户不存在");
         }
         return Result.success(merchant);
+    }
+
+    @GetMapping("user/{id}")
+    @Operation(summary = "根据ID获取商家详情")
+    public Result<MerchantDto> getMerchantByUserId(@PathVariable Integer id) {
+        LambdaQueryWrapper<Merchant> queryWrapper = new LambdaQueryWrapper<>();
+        queryWrapper.eq(Merchant::getUserId,id);
+        Merchant merchant = merchantService.getOne(queryWrapper);
+
+        MerchantDto merchantDto = new MerchantDto();
+        BeanUtils.copyProperties(merchantDto,merchant);
+        return Result.success(merchantDto);
     }
 
     @GetMapping("/my")
