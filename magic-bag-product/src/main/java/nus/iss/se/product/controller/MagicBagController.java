@@ -67,7 +67,14 @@ public class MagicBagController {
         queryWrapper.in(MagicBag::getId,ids);
         List<MagicBag> list = magicBagService.list(queryWrapper);
 
-        List<MagicBagDto> result = new ArrayList<>();
+        List<MagicBagDto> result = list.stream()
+                .map(magicBag -> {
+                    MagicBagDto dto = new MagicBagDto();
+                    BeanUtils.copyProperties(magicBag, dto);
+                    return dto;
+                })
+                .toList();
+
         BeanUtils.copyProperties(list,result);
         return Result.success(result);
     }
