@@ -47,7 +47,9 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag> i
 
     @Override
     public MagicBagDto getMagicBagById(Integer id) {
-        MagicBag magicBag = baseMapper.selectById(id);
+        QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id).eq("is_active", true);
+        MagicBag magicBag = baseMapper.selectOne(queryWrapper);
         if (magicBag == null) {
             return null;
         }
