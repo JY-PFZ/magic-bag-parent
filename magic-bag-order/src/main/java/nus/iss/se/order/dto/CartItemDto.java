@@ -6,7 +6,7 @@ import lombok.Data;
 @Data
 @AllArgsConstructor
 public class CartItemDto {
-    private Integer itemId;
+    private Integer id;
     private Integer magicBagId; // 添加商品ID字段
     private String bagName;
     private double price;
