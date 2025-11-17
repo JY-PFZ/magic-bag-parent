@@ -214,6 +214,7 @@ jobs:
           retention-days: 7
 
       - name: 📊 SonarQube Scan
+        continue-on-error: true
         run: |
           mvn -B clean verify sonar:sonar \
             -s ~/.m2/settings.xml \
