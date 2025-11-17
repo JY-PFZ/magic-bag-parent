@@ -47,7 +47,9 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag> i
 
     @Override
     public MagicBagDto getMagicBagById(Integer id) {
-        MagicBag magicBag = baseMapper.selectById(id);
+        QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id).eq("is_active", true);
+        MagicBag magicBag = baseMapper.selectOne(queryWrapper);
         if (magicBag == null) {
             return null;
         }
@@ -83,9 +85,11 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag> i
     @Override
     @Transactional
     public MagicBagDto updateMagicBag(Integer id, MagicBagUpdateDto updateDto) {
-        MagicBag existingMagicBag = baseMapper.selectById(id);
+        QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("id", id).eq("is_active", true);
+        MagicBag existingMagicBag = baseMapper.selectOne(queryWrapper);
         if (existingMagicBag == null) {
-            throw new RuntimeException("盲盒不存在");
+            throw new RuntimeException("盲盒不存在或已被删除");
         }
 
         if (updateDto.getTitle() != null) existingMagicBag.setTitle(updateDto.getTitle());
