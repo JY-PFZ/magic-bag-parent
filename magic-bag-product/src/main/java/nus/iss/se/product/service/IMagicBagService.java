@@ -46,4 +46,9 @@ public interface IMagicBagService extends IService<MagicBag> {
      * 删除盲盒商品
      */
     boolean deleteMagicBag(Integer id);
+
+    /**
+     * 批量获取盲盒商品
+     */
+    List<MagicBagDto> getBatchMagicBags(List<Integer> ids);
 }
