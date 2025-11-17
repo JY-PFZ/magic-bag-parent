@@ -21,7 +21,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  implements IMagicBagService {
+public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag> implements IMagicBagService {
 
     @Override
     public MagicBagListResponse getAllMagicBags(Integer page, Integer size) {
@@ -47,9 +47,7 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  
 
     @Override
     public MagicBagDto getMagicBagById(Integer id) {
-        QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("id", id).eq("is_active", true);
-        MagicBag magicBag = baseMapper.selectOne(queryWrapper);
+        MagicBag magicBag = baseMapper.selectById(id);
         if (magicBag == null) {
             return null;
         }
@@ -59,17 +57,13 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  
     @Override
     public List<MagicBagDto> getMagicBagsByCategory(String category) {
         List<MagicBag> magicBags = baseMapper.findByCategory(category);
-        return magicBags.stream()
-                .map(this::convertToDto)
-                .toList();
+        return magicBags.stream().map(this::convertToDto).toList();
     }
 
     @Override
     public List<MagicBagDto> getMagicBagsByMerchantId(Integer merchantId) {
         List<MagicBag> magicBags = baseMapper.findByMerchantId(merchantId);
-        return magicBags.stream()
-                .map(this::convertToDto)
-                .toList();
+        return magicBags.stream().map(this::convertToDto).toList();
     }
 
     @Override
@@ -78,60 +72,34 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  
         MagicBag magicBag = new MagicBag();
         BeanUtils.copyProperties(createDto, magicBag);
 
-        // 设置默认值
         magicBag.setActive(true);
         magicBag.setCreatedAt(LocalDateTime.now());
         magicBag.setUpdatedAt(LocalDateTime.now());
 
         save(magicBag);
-
         return convertToDto(magicBag);
     }
 
     @Override
     @Transactional
     public MagicBagDto updateMagicBag(Integer id, MagicBagUpdateDto updateDto) {
-        QueryWrapper<MagicBag> queryWrapper = new QueryWrapper<>();
-        queryWrapper.eq("id", id).eq("is_active", true);
-        MagicBag existingMagicBag = baseMapper.selectOne(queryWrapper);
+        MagicBag existingMagicBag = baseMapper.selectById(id);
         if (existingMagicBag == null) {
-            throw new RuntimeException("盲盒不存在或已被删除");
+            throw new RuntimeException("盲盒不存在");
         }
 
-        // 只更新非空字段
-        if (updateDto.getTitle() != null) {
-            existingMagicBag.setTitle(updateDto.getTitle());
-        }
-        if (updateDto.getDescription() != null) {
-            existingMagicBag.setDescription(updateDto.getDescription());
-        }
-        if (updateDto.getPrice() != null) {
-            existingMagicBag.setPrice(updateDto.getPrice());
-        }
-        if (updateDto.getQuantity() != null) {
-            existingMagicBag.setQuantity(updateDto.getQuantity());
-        }
-        if (updateDto.getPickupStartTime() != null) {
-            existingMagicBag.setPickupStartTime(updateDto.getPickupStartTime());
-        }
-        if (updateDto.getPickupEndTime() != null) {
-            existingMagicBag.setPickupEndTime(updateDto.getPickupEndTime());
-        }
-        if (updateDto.getAvailableDate() != null) {
-            existingMagicBag.setAvailableDate(updateDto.getAvailableDate());
-        }
-        if (updateDto.getCategory() != null) {
-            existingMagicBag.setCategory(updateDto.getCategory());
-        }
-        if (updateDto.getImageUrl() != null) {
-            existingMagicBag.setImageUrl(updateDto.getImageUrl());
-        }
-        if (updateDto.getIsActive() != null) {
-            existingMagicBag.setActive(updateDto.getIsActive());
-        }
+        if (updateDto.getTitle() != null) existingMagicBag.setTitle(updateDto.getTitle());
+        if (updateDto.getDescription() != null) existingMagicBag.setDescription(updateDto.getDescription());
+        if (updateDto.getPrice() != null) existingMagicBag.setPrice(updateDto.getPrice());
+        if (updateDto.getQuantity() != null) existingMagicBag.setQuantity(updateDto.getQuantity());
+        if (updateDto.getPickupStartTime() != null) existingMagicBag.setPickupStartTime(updateDto.getPickupStartTime());
+        if (updateDto.getPickupEndTime() != null) existingMagicBag.setPickupEndTime(updateDto.getPickupEndTime());
+        if (updateDto.getAvailableDate() != null) existingMagicBag.setAvailableDate(updateDto.getAvailableDate());
+        if (updateDto.getCategory() != null) existingMagicBag.setCategory(updateDto.getCategory());
+        if (updateDto.getImageUrl() != null) existingMagicBag.setImageUrl(updateDto.getImageUrl());
+        if (updateDto.getIsActive() != null) existingMagicBag.setActive(updateDto.getIsActive());
 
         existingMagicBag.setUpdatedAt(LocalDateTime.now());
-
         baseMapper.updateById(existingMagicBag);
 
         return convertToDto(existingMagicBag);
@@ -144,26 +112,30 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag>  
         if (magicBag == null) {
             return false;
         }
-
-        // 软删除：将is_active设置为false
         magicBag.setActive(false);
         magicBag.setUpdatedAt(LocalDateTime.now());
 
-        int result = baseMapper.updateById(magicBag);
-        return result > 0;
+        return baseMapper.updateById(magicBag) > 0;
     }
 
     private MagicBagDto convertToDto(MagicBag magicBag) {
-        if (magicBag == null) {
-            return null;
-        }
+        if (magicBag == null) return null;
+
         MagicBagDto dto = new MagicBagDto();
-        // 首先，自动复制所有其他名称和类型匹配的字段
         BeanUtils.copyProperties(magicBag, dto);
 
-        // 手动处理 price 字段的类型转换 (从 Float 到 BigDecimal)
         dto.setPrice(BigDecimal.valueOf(magicBag.getPrice()));
-
         return dto;
+    }
+
+    @Override
+    public List<MagicBagDto> getBatchMagicBags(List<Integer> ids) {
+        if (ids == null || ids.isEmpty()) return List.of();
+
+        List<MagicBag> bags = baseMapper.selectBatchIds(ids);
+
+        return bags.stream()
+                .map(this::convertToDto)
+                .toList();
     }
 }
