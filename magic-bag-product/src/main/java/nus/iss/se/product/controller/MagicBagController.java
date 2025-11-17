@@ -124,17 +124,6 @@ public class MagicBagController {
         }
     }
 
-
-    /**
-     * 批量查询盲盒
-     */
-    @PostMapping("/magic-bags/batch-query")
-    @Operation(summary = "批量查询盲盒", description = "根据ID列表批量查询盲盒信息")
-    public Result<List<MagicBagDto>> getBatchMagicBags(@RequestBody List<Integer> ids) {
-        List<MagicBagDto> magicBags = magicBagService.getBatchMagicBags(ids);
-        return Result.success(magicBags);
-    }
-
     /**
      * 上传产品图片
      */
