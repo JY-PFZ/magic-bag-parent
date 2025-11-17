@@ -16,7 +16,7 @@ import software.amazon.awssdk.services.s3.S3ClientBuilder;
  */
 @Configuration
 @RequiredArgsConstructor
-public class BaseConfig {
+public class Config {
 
     @Bean
     public S3Client s3Client(S3Properties s3Properties) {
