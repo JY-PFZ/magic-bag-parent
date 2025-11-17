@@ -71,9 +71,9 @@ public class OrderServiceImpl implements IOrderService {
                 break;
             case MERCHANT:
                 Integer merchantUserId = currentUser.getId();
-                MerchantDto merchant = merchantClient.getMerchantById(merchantUserId).getData();
+                MerchantDto merchant = merchantClient.getMerchantByUserId(merchantUserId).getData();
                 if (merchant == null) {
-                    throw new BusinessException(ResultStatus.USER_NOT_FOUND, "Merchant user context not found.");
+                    throw new BusinessException(ResultStatus.USER_NOT_FOUND, "Merchant user context not found:"+merchantUserId);
                 }
                 orderPage = orderMapper.findByMerchantId(page, merchant.getId());
                 break;

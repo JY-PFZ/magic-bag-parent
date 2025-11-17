@@ -396,11 +396,11 @@ jobs:
       - name: 🕵️ Run ZAP Baseline Scan
         run: |
           mkdir -p zap-report
-          docker run -v $PWD/zap-report:/zap/wrk:rw \
+          docker run -v "$PWD/zap-report:/zap/wrk:rw" \
             --rm \
-            ghcr.io/zaproxy/zap-stable \
+            owasp/zap2docker-stable \
             zap-baseline.py \
-            -t http://${{ secrets.EC2_HOST }}:10016 \
+            -t "http://${{ secrets.EC2_HOST }}:10016" \
             -r zap-report.html
 
       - name: 📤 Upload ZAP Report
