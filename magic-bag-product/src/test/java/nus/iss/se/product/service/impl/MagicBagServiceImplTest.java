@@ -48,22 +48,22 @@ class MagicBagServiceImplTest {
         bag.setPrice(25.0f);
         bag.setActive(true);
         bag.setMerchantId(1);
-        when(magicBagMapper.selectById(1)).thenReturn(bag);
+        when(magicBagMapper.selectOne(any(QueryWrapper.class))).thenReturn(bag);
 
         MagicBagDto result = magicBagService.getMagicBagById(1);
 
         assertNotNull(result);
         assertEquals(1, result.getId());
         assertEquals("测试盲盒", result.getTitle());
-        verify(magicBagMapper, times(1)).selectById(1);
+        verify(magicBagMapper, times(1)).selectOne(any(QueryWrapper.class));
     }
 
     @Test
     void testGetMagicBagById_NotFound() {
-        when(magicBagMapper.selectById(999)).thenReturn(null);
+        when(magicBagMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
         MagicBagDto result = magicBagService.getMagicBagById(999);
         assertNull(result);
-        verify(magicBagMapper, times(1)).selectById(999);
+        verify(magicBagMapper, times(1)).selectOne(any(QueryWrapper.class));
     }
 
     @Test
@@ -172,14 +172,14 @@ class MagicBagServiceImplTest {
         updateDto.setTitle("新标题");
         updateDto.setPrice(25.0f);
 
-        when(magicBagMapper.selectById(1)).thenReturn(existingBag);
+        when(magicBagMapper.selectOne(any(QueryWrapper.class))).thenReturn(existingBag);
         when(magicBagMapper.updateById(any(MagicBag.class))).thenReturn(1);
 
         MagicBagDto result = magicBagService.updateMagicBag(1, updateDto);
 
         assertNotNull(result);
         assertEquals(1, result.getId());
-        verify(magicBagMapper, times(1)).selectById(1);
+        verify(magicBagMapper, times(1)).selectOne(any(QueryWrapper.class));
         verify(magicBagMapper, times(1)).updateById(any(MagicBag.class));
     }
 
@@ -188,13 +188,13 @@ class MagicBagServiceImplTest {
         MagicBagUpdateDto updateDto = new MagicBagUpdateDto();
         updateDto.setTitle("新标题");
 
-        when(magicBagMapper.selectById(999)).thenReturn(null);
+        when(magicBagMapper.selectOne(any(QueryWrapper.class))).thenReturn(null);
 
         RuntimeException exception = assertThrows(RuntimeException.class,
             () -> magicBagService.updateMagicBag(999, updateDto));
 
-        assertEquals("盲盒不存在", exception.getMessage());
-        verify(magicBagMapper, times(1)).selectById(999);
+        assertEquals("盲盒不存在或已被删除", exception.getMessage());
+        verify(magicBagMapper, times(1)).selectOne(any(QueryWrapper.class));
         verify(magicBagMapper, never()).updateById(any());
     }
 
