@@ -62,22 +62,12 @@ public class MagicBagController {
     }
 
     @PostMapping("/batch-query")
-    public Result<List<MagicBagDto>> getBatchMagicBagById(@RequestBody List<Integer> ids) {
-        LambdaQueryWrapper<MagicBag> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.in(MagicBag::getId,ids);
-        List<MagicBag> list = magicBagService.list(queryWrapper);
-
-        List<MagicBagDto> result = list.stream()
-                .map(magicBag -> {
-                    MagicBagDto dto = new MagicBagDto();
-                    BeanUtils.copyProperties(magicBag, dto);
-                    return dto;
-                })
-                .toList();
-
-        BeanUtils.copyProperties(list,result);
-        return Result.success(result);
+    @Operation(summary = "批量查询盲盒", description = "根据多个 ID 查询盲盒产品信息")
+    public Result<List<MagicBagDto>> getBatchMagicBags(@RequestBody List<Integer> ids) {
+        List<MagicBagDto> bags = magicBagService.getBatchMagicBags(ids);
+        return Result.success(bags);
     }
+
     
     /**
      * 根据分类获取盲盒
