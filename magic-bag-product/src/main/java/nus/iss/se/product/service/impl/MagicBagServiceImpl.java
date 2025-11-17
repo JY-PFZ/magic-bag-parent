@@ -118,17 +118,6 @@ public class MagicBagServiceImpl extends ServiceImpl<MagicBagMapper, MagicBag> i
         return baseMapper.updateById(magicBag) > 0;
     }
 
-    @Override
-    public List<MagicBagDto> getBatchMagicBags(List<Integer> ids) {
-        if (ids == null || ids.isEmpty()) return List.of();
-
-        List<MagicBag> bags = baseMapper.selectBatchIds(ids);
-
-        return bags.stream()
-                .map(this::convertToDto)
-                .toList();
-    }
-
     private MagicBagDto convertToDto(MagicBag magicBag) {
         if (magicBag == null) return null;
 
